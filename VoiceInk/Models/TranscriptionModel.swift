@@ -84,7 +84,7 @@ struct ParakeetModel: TranscriptionModel {
 
 // A new struct for cloud models
 struct CloudModel: TranscriptionModel {
-    let id: UUID
+    var id: UUID { .stable(from: "CloudModel.\(name)") }
     let name: String
     let displayName: String
     let description: String
@@ -94,8 +94,7 @@ struct CloudModel: TranscriptionModel {
     let isMultilingualModel: Bool
     let supportedLanguages: [String: String]
 
-    init(id: UUID = UUID(), name: String, displayName: String, description: String, provider: ModelProvider, speed: Double, accuracy: Double, isMultilingual: Bool, supportedLanguages: [String: String]) {
-        self.id = id
+    init(name: String, displayName: String, description: String, provider: ModelProvider, speed: Double, accuracy: Double, isMultilingual: Bool, supportedLanguages: [String: String]) {
         self.name = name
         self.displayName = displayName
         self.description = description
