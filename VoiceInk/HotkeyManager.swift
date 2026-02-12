@@ -202,30 +202,31 @@ class HotkeyManager: ObservableObject {
 
         // Mouse Down
         let downMonitor = NSEvent.addGlobalMonitorForEvents(matching: .otherMouseDown) { [weak self] event in
-            guard let self = self, event.buttonNumber == 2 else { return }
+            guard event.buttonNumber == 2 else { return }
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.middleClickTask?.cancel()
+                self.middleClickTask = Task {
+                    do {
+                        let delay = UInt64(self.middleClickActivationDelay) * 1_000_000 // ms to ns
+                        try await Task.sleep(nanoseconds: delay)
 
-            self.middleClickTask?.cancel()
-            self.middleClickTask = Task {
-                do {
-                    let delay = UInt64(self.middleClickActivationDelay) * 1_000_000 // ms to ns
-                    try await Task.sleep(nanoseconds: delay)
-                    
-                    guard self.isMiddleClickToggleEnabled, !Task.isCancelled else { return }
-                    
-                    Task { @MainActor in
+                        guard self.isMiddleClickToggleEnabled, !Task.isCancelled else { return }
                         guard self.canProcessHotkeyAction else { return }
                         await self.whisperState.handleToggleMiniRecorder()
+                    } catch {
+                        // Cancelled
                     }
-                } catch {
-                    // Cancelled
                 }
             }
         }
 
         // Mouse Up
         let upMonitor = NSEvent.addGlobalMonitorForEvents(matching: .otherMouseUp) { [weak self] event in
-            guard let self = self, event.buttonNumber == 2 else { return }
-            self.middleClickTask?.cancel()
+            guard event.buttonNumber == 2 else { return }
+            Task { @MainActor [weak self] in
+                self?.middleClickTask?.cancel()
+            }
         }
 
         middleClickMonitors = [downMonitor, upMonitor]
