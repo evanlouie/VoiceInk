@@ -5,11 +5,11 @@ struct AudioVisualizer: View {
     let color: Color
     let isActive: Bool
 
-    private let barCount = 15
-    private let barWidth: CGFloat = 3
-    private let barSpacing: CGFloat = 2
-    private let minHeight: CGFloat = 4
-    private let maxHeight: CGFloat = 28
+    private let barCount = 7
+    private let barWidth: CGFloat = 2.5
+    private let barSpacing: CGFloat = 1.5
+    private let minHeight: CGFloat = 3
+    private let maxHeight: CGFloat = 18
 
     private let phases: [Double]
 
@@ -57,10 +57,10 @@ struct AudioVisualizer: View {
 
 struct StaticVisualizer: View {
     // Match AudioVisualizer dimensions
-    private let barCount = 15
-    private let barWidth: CGFloat = 3
-    private let staticHeight: CGFloat = 4
-    private let barSpacing: CGFloat = 2
+    private let barCount = 7
+    private let barWidth: CGFloat = 2.5
+    private let staticHeight: CGFloat = 3
+    private let barSpacing: CGFloat = 1.5
     let color: Color
 
     var body: some View {
@@ -103,15 +103,15 @@ struct ProcessingStatusDisplay: View {
     }
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 3) {
             Text(label)
                 .foregroundColor(color)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 10, weight: .medium))
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
 
             ProgressAnimation(color: color, animationSpeed: animationSpeed)
         }
-        .frame(height: 28) // Match AudioVisualizer maxHeight for no layout shift
+        .frame(height: 18) // Match AudioVisualizer maxHeight for no layout shift
     }
 }

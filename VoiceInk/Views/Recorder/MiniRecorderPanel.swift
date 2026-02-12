@@ -24,7 +24,7 @@ class MiniRecorderPanel: NSPanel {
         isMovableByWindowBackground = true
         backgroundColor = .clear
         isOpaque = false
-        hasShadow = false
+        hasShadow = true
         titlebarAppearsTransparent = true
         titleVisibility = .hidden
         standardWindowButton(.closeButton)?.isHidden = true
@@ -32,12 +32,12 @@ class MiniRecorderPanel: NSPanel {
     
     static func calculateWindowMetrics() -> NSRect {
         guard let screen = NSScreen.main else {
-            return NSRect(x: 0, y: 0, width: 184, height: 60)
+            return NSRect(x: 0, y: 0, width: 220, height: 50)
         }
 
-        // Fixed compact window size - minimal and unobtrusive
-        let width: CGFloat = 184
-        let height: CGFloat = 60
+        // Window must accommodate expanded hover state
+        let width: CGFloat = 220
+        let height: CGFloat = 50
         let padding: CGFloat = 24
 
         let visibleFrame = screen.visibleFrame

@@ -314,11 +314,11 @@ struct RecorderStatusDisplay: View {
                     color: .white,
                     isActive: currentState == .recording
                 )
-                .scaleEffect(y: menuBarHeight != nil ? min(1.0, (menuBarHeight! - 8) / 25) : 1.0, anchor: .center)
+                .scaleEffect(y: menuBarHeight != nil ? min(1.0, (menuBarHeight! - 8) / 18) : 1.0, anchor: .center)
                 .transition(.opacity)
             } else {
                 StaticVisualizer(color: .white)
-                    .scaleEffect(y: menuBarHeight != nil ? min(1.0, (menuBarHeight! - 8) / 25) : 1.0, anchor: .center)
+                    .scaleEffect(y: menuBarHeight != nil ? min(1.0, (menuBarHeight! - 8) / 18) : 1.0, anchor: .center)
                     .transition(.opacity)
             }
         }
