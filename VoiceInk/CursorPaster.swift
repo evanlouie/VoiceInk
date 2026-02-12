@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import os.log
 
 @MainActor
 class CursorPaster {
@@ -30,17 +31,17 @@ class CursorPaster {
             } else {
                 pasteUsingCommandV()
             }
-        }
 
-        if shouldRestoreClipboard {
-            let restoreDelay = UserDefaults.standard.double(forKey: "clipboardRestoreDelay")
-            let delay = max(restoreDelay, 0.25)
+            if shouldRestoreClipboard {
+                let restoreDelay = UserDefaults.standard.double(forKey: "clipboardRestoreDelay")
+                let delay = max(restoreDelay, 0.25)
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                if !savedContents.isEmpty {
-                    pasteboard.clearContents()
-                    for (type, data) in savedContents {
-                        pasteboard.setData(data, forType: type)
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    if !savedContents.isEmpty {
+                        pasteboard.clearContents()
+                        for (type, data) in savedContents {
+                            pasteboard.setData(data, forType: type)
+                        }
                     }
                 }
             }
@@ -66,6 +67,8 @@ class CursorPaster {
         return false
     }
     
+    private static let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "CursorPaster")
+
     private static func pasteUsingCommandV() {
         guard AXIsProcessTrusted() else {
             return
@@ -73,19 +76,22 @@ class CursorPaster {
         
         let source = CGEventSource(stateID: .hidSystemState)
         
-        let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: true)
-        let vDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)
-        let vUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
-        let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: false)
+        guard let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: true),
+              let vDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
+              let vUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false),
+              let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: false) else {
+            logger.warning("Failed to create CGEvent for paste — skipping to avoid stuck modifier keys")
+            return
+        }
         
-        cmdDown?.flags = .maskCommand
-        vDown?.flags = .maskCommand
-        vUp?.flags = .maskCommand
+        cmdDown.flags = .maskCommand
+        vDown.flags = .maskCommand
+        vUp.flags = .maskCommand
         
-        cmdDown?.post(tap: .cghidEventTap)
-        vDown?.post(tap: .cghidEventTap)
-        vUp?.post(tap: .cghidEventTap)
-        cmdUp?.post(tap: .cghidEventTap)
+        cmdDown.post(tap: .cghidEventTap)
+        vDown.post(tap: .cghidEventTap)
+        vUp.post(tap: .cghidEventTap)
+        cmdUp.post(tap: .cghidEventTap)
     }
 
     // Simulate pressing the Return / Enter key
