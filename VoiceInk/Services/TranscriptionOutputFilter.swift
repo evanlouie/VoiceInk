@@ -63,11 +63,11 @@ struct TranscriptionOutputFilter {
         filteredText = filteredText.replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)
         filteredText = filteredText.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Log results
+        // Log metadata only to avoid leaking transcription contents in logs.
         if filteredText != text {
-            logger.notice("📝 Output filter result: \(filteredText)")
+            logger.notice("📝 Output filter changed text (\(text.count) -> \(filteredText.count) chars)")
         } else {
-            logger.notice("📝 Output filter result (unchanged): \(filteredText)")
+            logger.notice("📝 Output filter left text unchanged (\(filteredText.count) chars)")
         }
 
         return filteredText

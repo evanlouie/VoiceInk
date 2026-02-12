@@ -39,6 +39,8 @@ struct OnboardingPermissionsView: View {
     @State private var scale: CGFloat = 0.8
     @State private var opacity: CGFloat = 0
     @State private var showModelDownload = false
+    @State private var accessibilityPollingTimer: Timer?
+    @State private var screenRecordingPollingTimer: Timer?
     
     private let permissions: [OnboardingPermission] = [
         OnboardingPermission(
@@ -252,6 +254,12 @@ struct OnboardingPermissionsView: View {
             // Ensure audio devices are loaded
             audioDeviceManager.loadAvailableDevices()
         }
+        .onDisappear {
+            invalidatePermissionPollingTimers()
+        }
+        .onChange(of: currentPermissionIndex) { _, _ in
+            invalidatePermissionPollingTimers()
+        }
     }
     
     private func animateIn() {
@@ -282,6 +290,47 @@ struct OnboardingPermissionsView: View {
         
         // Check keyboard shortcut
         permissionStates[4] = hotkeyManager.isShortcutConfigured
+    }
+
+    private func invalidatePermissionPollingTimers() {
+        accessibilityPollingTimer?.invalidate()
+        accessibilityPollingTimer = nil
+        screenRecordingPollingTimer?.invalidate()
+        screenRecordingPollingTimer = nil
+    }
+
+    private func startAccessibilityPermissionPolling(for permissionIndex: Int) {
+        accessibilityPollingTimer?.invalidate()
+        accessibilityPollingTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+            if AXIsProcessTrusted() {
+                timer.invalidate()
+                accessibilityPollingTimer = nil
+                guard permissionIndex < permissionStates.count else { return }
+                permissionStates[permissionIndex] = true
+                if currentPermissionIndex == permissionIndex {
+                    withAnimation {
+                        showAnimation = true
+                    }
+                }
+            }
+        }
+    }
+
+    private func startScreenRecordingPermissionPolling(for permissionIndex: Int) {
+        screenRecordingPollingTimer?.invalidate()
+        screenRecordingPollingTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+            if CGPreflightScreenCaptureAccess() {
+                timer.invalidate()
+                screenRecordingPollingTimer = nil
+                guard permissionIndex < permissionStates.count else { return }
+                permissionStates[permissionIndex] = true
+                if currentPermissionIndex == permissionIndex {
+                    withAnimation {
+                        showAnimation = true
+                    }
+                }
+            }
+        }
     }
     
     private func requestPermission() {
@@ -328,21 +377,13 @@ struct OnboardingPermissionsView: View {
             moveToNext()
             
         case .accessibility:
+            let permissionIndex = currentPermissionIndex
             let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
             AXIsProcessTrustedWithOptions(options)
-            
-            // Start checking for permission status
-            Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
-                if AXIsProcessTrusted() {
-                    timer.invalidate()
-                    permissionStates[currentPermissionIndex] = true
-                    withAnimation {
-                        showAnimation = true
-                    }
-                }
-            }
+            startAccessibilityPermissionPolling(for: permissionIndex)
             
         case .screenRecording:
+            let permissionIndex = currentPermissionIndex
             // First try to request permission programmatically
             CGRequestScreenCaptureAccess()
             
@@ -351,16 +392,7 @@ struct OnboardingPermissionsView: View {
                 NSWorkspace.shared.open(prefpaneURL)
             }
             
-            // Start checking for permission status
-            Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
-                if CGPreflightScreenCaptureAccess() {
-                    timer.invalidate()
-                    permissionStates[currentPermissionIndex] = true
-                    withAnimation {
-                        showAnimation = true
-                    }
-                }
-            }
+            startScreenRecordingPermissionPolling(for: permissionIndex)
             
         case .keyboardShortcut:
             // The keyboard shortcut is handled by the KeyboardShortcuts.Recorder

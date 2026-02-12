@@ -72,11 +72,16 @@ class StreamingTranscriptionService {
     /// Whether the streaming connection is fully established and actively sending.
     var isActive: Bool { state == .streaming || state == .committing }
 
+    /// Resets the audio ingress source for a new session before callbacks are exposed to the recorder.
+    func resetAudioChunkSource() {
+        chunkSource.finish()
+        chunkSource = AudioChunkSource()
+    }
+
     /// Start a streaming transcription session for the given model.
     func startStreaming(model: any TranscriptionModel) async throws {
         state = .connecting
         committedSegments = []
-        chunkSource = AudioChunkSource()
 
         let provider = createProvider(for: model)
         self.provider = provider

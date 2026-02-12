@@ -62,6 +62,9 @@ final class StreamingTranscriptionSession: TranscriptionSession {
     func prepare(model: any TranscriptionModel) async throws -> ((Data) -> Void)? {
         self.model = model
 
+        // Ensure a fresh chunk source exists before exposing callback to recorder.
+        streamingService.resetAudioChunkSource()
+
         // Return callback immediately; WebSocket connects in background
         let service = streamingService
         let callback: (Data) -> Void = { [weak service] data in

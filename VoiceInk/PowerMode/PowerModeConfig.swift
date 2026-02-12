@@ -209,14 +209,17 @@ class PowerModeManager: ObservableObject {
     }
 
     func getConfigurationForURL(_ url: String) -> PowerModeConfig? {
-        let cleanedURL = cleanURL(url)
+        guard let currentURL = normalizeURLForMatching(url) else {
+            return nil
+        }
         
         for config in configurations.filter({ $0.isEnabled }) {
             if let urlConfigs = config.urlConfigs {
                 for urlConfig in urlConfigs {
-                    let configURL = cleanURL(urlConfig.url)
-                    
-                    if cleanedURL.contains(configURL) {
+                    guard let patternURL = normalizeURLForMatching(urlConfig.url) else { continue }
+
+                    if hostMatches(currentHost: currentURL.host, patternHost: patternURL.host)
+                        && pathMatches(currentPath: currentURL.path, patternPath: patternURL.path) {
                         return config
                     }
                 }
@@ -309,11 +312,55 @@ class PowerModeManager: ObservableObject {
     }
 
     func cleanURL(_ url: String) -> String {
-        return url.lowercased()
-            .replacingOccurrences(of: "https://", with: "")
-            .replacingOccurrences(of: "http://", with: "")
-            .replacingOccurrences(of: "www.", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let normalized = normalizeURLForMatching(url) else {
+            return ""
+        }
+
+        if normalized.path.isEmpty {
+            return normalized.host
+        }
+
+        return "\(normalized.host)\(normalized.path)"
+    }
+
+    func normalizedURLString(_ url: String) -> String? {
+        let cleaned = cleanURL(url)
+        return cleaned.isEmpty ? nil : cleaned
+    }
+
+    private func normalizeURLForMatching(_ value: String) -> (host: String, path: String)? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let candidate = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
+        guard let components = URLComponents(string: candidate),
+              var host = components.host?.lowercased(),
+              !host.isEmpty else {
+            return nil
+        }
+
+        if host.hasPrefix("www.") {
+            host.removeFirst(4)
+        }
+
+        var path = components.path.lowercased()
+        if path == "/" {
+            path = ""
+        }
+        while path.count > 1 && path.hasSuffix("/") {
+            path.removeLast()
+        }
+
+        return (host: host, path: path)
+    }
+
+    private func hostMatches(currentHost: String, patternHost: String) -> Bool {
+        currentHost == patternHost || currentHost.hasSuffix(".\(patternHost)")
+    }
+
+    private func pathMatches(currentPath: String, patternPath: String) -> Bool {
+        guard !patternPath.isEmpty else { return true }
+        return currentPath == patternPath || currentPath.hasPrefix("\(patternPath)/")
     }
 
     func setActiveConfiguration(_ config: PowerModeConfig?) {

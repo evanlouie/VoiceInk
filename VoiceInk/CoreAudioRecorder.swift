@@ -54,6 +54,13 @@ final class CoreAudioRecorder {
     private var renderBuffer: UnsafeMutablePointer<Float32>?
     private var renderBufferSize: UInt32 = 0
 
+    // Synchronizes access to callback-owned recorder resources.
+    private let ioStateLock = NSLock()
+
+    // Serial queue for file writes so the audio callback never performs disk I/O.
+    private let fileWriteQueue = DispatchQueue(label: "com.prakashjoshipax.voiceink.audio-file-writer")
+    private var acceptsFileWrites = false
+
     /// Called on the audio thread with raw PCM data (16-bit, 16kHz, mono) for streaming.
     /// Access is protected by an unfair lock to avoid a data race between the audio thread and callers.
     private let _onAudioChunkLock = OSAllocatedUnfairLock<((Data) -> Void)?>(initialState: nil)
@@ -113,24 +120,45 @@ final class CoreAudioRecorder {
         // Step 6: Initialize and start the AudioUnit
         try startAudioUnit()
 
+        ioStateLock.lock()
         isRecording = true
+        acceptsFileWrites = true
+        ioStateLock.unlock()
     }
 
     /// Stops the current recording
     func stopRecording() {
-        guard isRecording || audioUnit != nil else {
+        ioStateLock.lock()
+        let unitToStop = audioUnit
+        let shouldStop = isRecording || unitToStop != nil
+        ioStateLock.unlock()
+
+        guard shouldStop else {
             logger.notice("stopRecording: skipped, not recording and no audio unit")
             return
         }
         logger.notice("stopRecording: stopping core audio recorder")
 
+        // Clear streaming callback immediately to prevent additional chunk handling during teardown.
+        _onAudioChunkLock.withLock { $0 = nil }
+
         // Stop, uninitialize, and dispose AudioUnit
-        if let unit = audioUnit {
+        if let unit = unitToStop {
             AudioOutputUnitStop(unit)
             AudioUnitUninitialize(unit)
             AudioComponentInstanceDispose(unit)
-            audioUnit = nil
         }
+
+        ioStateLock.lock()
+        isRecording = false
+        acceptsFileWrites = false
+        audioUnit = nil
+        ioStateLock.unlock()
+
+        // Drain all queued writes before disposing file/buffers.
+        fileWriteQueue.sync {}
+
+        ioStateLock.lock()
 
         // Close audio file
         if let file = audioFile {
@@ -165,12 +193,9 @@ final class CoreAudioRecorder {
             renderBufferSize = 0
         }
 
-        // Clear the streaming callback under the lock
-        _onAudioChunkLock.withLock { $0 = nil }
-
-        isRecording = false
         currentDeviceID = 0
         recordingURL = nil
+        ioStateLock.unlock()
 
         // Reset meters
         meterLock.lock()
@@ -179,20 +204,42 @@ final class CoreAudioRecorder {
         meterLock.unlock()
     }
 
-    var isCurrentlyRecording: Bool { isRecording }
-    var currentRecordingURL: URL? { recordingURL }
-    var currentDevice: AudioDeviceID { currentDeviceID }
+    var isCurrentlyRecording: Bool {
+        ioStateLock.lock()
+        defer { ioStateLock.unlock() }
+        return isRecording
+    }
+
+    var currentRecordingURL: URL? {
+        ioStateLock.lock()
+        defer { ioStateLock.unlock() }
+        return recordingURL
+    }
+
+    var currentDevice: AudioDeviceID {
+        ioStateLock.lock()
+        defer { ioStateLock.unlock() }
+        return currentDeviceID
+    }
 
     /// Switches to a new input device mid-recording without stopping the file write
     func switchDevice(to newDeviceID: AudioDeviceID) throws {
-        guard isRecording, let unit = audioUnit else {
+        ioStateLock.lock()
+        let currentlyRecording = isRecording
+        let unit = audioUnit
+        ioStateLock.unlock()
+
+        guard currentlyRecording, let unit else {
             throw CoreAudioRecorderError.audioUnitNotInitialized
         }
 
         // Don't switch if it's the same device
-        guard newDeviceID != currentDeviceID else { return }
+        ioStateLock.lock()
+        let activeDeviceID = currentDeviceID
+        ioStateLock.unlock()
+        guard newDeviceID != activeDeviceID else { return }
 
-        let oldDeviceID = currentDeviceID
+        let oldDeviceID = activeDeviceID
         logger.notice("🎙️ Switching recording device from \(oldDeviceID) to \(newDeviceID)")
 
         // Step 1: Stop the AudioUnit (but keep file open)
@@ -272,6 +319,7 @@ final class CoreAudioRecorder {
 
         // Step 6: Reallocate buffers if needed
         let maxFrames: UInt32 = 4096
+        ioStateLock.lock()
         let bufferSamples = maxFrames * newDeviceFormat.mChannelsPerFrame
         if bufferSamples > renderBufferSize {
             renderBuffer?.deallocate()
@@ -328,6 +376,7 @@ final class CoreAudioRecorder {
         // Update stored format
         deviceFormat = newDeviceFormat
         currentDeviceID = newDeviceID
+        ioStateLock.unlock()
 
         // Step 7: Reinitialize and restart
         status = AudioUnitInitialize(unit)
@@ -665,8 +714,9 @@ final class CoreAudioRecorder {
         inBusNumber: UInt32,
         inNumberFrames: UInt32
     ) -> OSStatus {
-
-        guard let audioUnit = audioUnit, isRecording, let renderBuf = renderBuffer else {
+        ioStateLock.lock()
+        guard isRecording, let audioUnit = audioUnit, let renderBuf = renderBuffer else {
+            ioStateLock.unlock()
             return noErr
         }
 
@@ -676,6 +726,7 @@ final class CoreAudioRecorder {
 
         // Safety check - shouldn't happen with 4096 max frames
         guard requiredSamples <= renderBufferSize else {
+            ioStateLock.unlock()
             return noErr
         }
 
@@ -702,6 +753,7 @@ final class CoreAudioRecorder {
         )
 
         if status != noErr {
+            ioStateLock.unlock()
             return status
         }
 
@@ -709,7 +761,17 @@ final class CoreAudioRecorder {
         calculateMeters(from: &bufferList, frameCount: inNumberFrames)
 
         // Convert and write to file
-        convertAndWriteToFile(inputBuffer: &bufferList, frameCount: inNumberFrames)
+        let convertedChunk = convertToPCMChunk(inputBuffer: &bufferList, frameCount: inNumberFrames)
+        ioStateLock.unlock()
+
+        if let convertedChunk {
+            enqueueFileWrite(data: convertedChunk.data, frameCount: convertedChunk.frameCount)
+
+            // Send the same PCM data to the streaming callback if set.
+            // Copy the closure reference out under the lock, then call outside the lock.
+            let chunkHandler = _onAudioChunkLock.withLock { $0 }
+            chunkHandler?(convertedChunk.data)
+        }
 
         return noErr
     }
@@ -745,20 +807,18 @@ final class CoreAudioRecorder {
         meterLock.unlock()
     }
 
-    private func convertAndWriteToFile(inputBuffer: inout AudioBufferList, frameCount: UInt32) {
-        guard let file = audioFile else { return }
-
+    private func convertToPCMChunk(inputBuffer: inout AudioBufferList, frameCount: UInt32) -> (data: Data, frameCount: UInt32)? {
         let inputChannels = deviceFormat.mChannelsPerFrame
         let inputSampleRate = deviceFormat.mSampleRate
         let outputSampleRate = outputFormat.mSampleRate
 
         // Get input samples
-        guard let inputData = inputBuffer.mBuffers.mData else { return }
+          guard let inputData = inputBuffer.mBuffers.mData else { return nil }
         let inputSamples = inputData.assumingMemoryBound(to: Float32.self)
 
         guard let outputBuffer = conversionBuffer,
               let monoBuffer = monoMixBuffer,
-              frameCount <= monoMixBufferSize else { return }
+              frameCount <= monoMixBufferSize else { return nil }
 
         // Step 1: Mix multi-channel Float32 to mono Float32
         for i in 0..<Int(frameCount) {
@@ -774,7 +834,7 @@ final class CoreAudioRecorder {
         if inputSampleRate == outputSampleRate {
             // No resampling needed — convert mono Float32 to Int16
             outputFrameCount = frameCount
-            guard outputFrameCount <= conversionBufferSize else { return }
+            guard outputFrameCount <= conversionBufferSize else { return nil }
 
             for i in 0..<Int(frameCount) {
                 let scaled = monoBuffer[i] * 32767.0
@@ -814,36 +874,48 @@ final class CoreAudioRecorder {
             )
 
             if convertStatus != noErr {
-                return
+                return nil
             }
 
             outputFrameCount = packetCount
         }
 
-        guard outputFrameCount > 0 else { return }
+        guard outputFrameCount > 0 else { return nil }
 
-        // Write to file
-        var writeBufferList = AudioBufferList(
-            mNumberBuffers: 1,
-            mBuffers: AudioBuffer(
-                mNumberChannels: 1,
-                mDataByteSize: outputFrameCount * UInt32(outputFormat.mBytesPerFrame),
-                mData: outputBuffer
-            )
-        )
+        let byteCount = Int(outputFrameCount) * MemoryLayout<Int16>.size
+        let data = Data(bytes: outputBuffer, count: byteCount)
+        return (data: data, frameCount: outputFrameCount)
+    }
 
-        let writeStatus = ExtAudioFileWrite(file, outputFrameCount, &writeBufferList)
-        if writeStatus != noErr {
-            logger.error("🎙️ ExtAudioFileWrite failed with status: \(writeStatus)")
-        }
+    private func enqueueFileWrite(data: Data, frameCount: UInt32) {
+        fileWriteQueue.async { [weak self] in
+            guard let self else { return }
 
-        // Send the same PCM data to the streaming callback if set.
-        // Copy the closure reference out under the lock, then call outside the lock.
-        let chunkHandler = _onAudioChunkLock.withLock { $0 }
-        if let chunkHandler {
-            let byteCount = Int(outputFrameCount) * MemoryLayout<Int16>.size
-            let data = Data(bytes: outputBuffer, count: byteCount)
-            chunkHandler(data)
+            self.ioStateLock.lock()
+            let canWrite = self.acceptsFileWrites
+            let file = self.audioFile
+            let bytesPerFrame = UInt32(MemoryLayout<Int16>.size)
+            self.ioStateLock.unlock()
+
+            guard canWrite, let file else { return }
+
+            data.withUnsafeBytes { rawBuffer in
+                guard let baseAddress = rawBuffer.baseAddress else { return }
+
+                var writeBufferList = AudioBufferList(
+                    mNumberBuffers: 1,
+                    mBuffers: AudioBuffer(
+                        mNumberChannels: 1,
+                        mDataByteSize: frameCount * bytesPerFrame,
+                        mData: UnsafeMutableRawPointer(mutating: baseAddress)
+                    )
+                )
+
+                let writeStatus = ExtAudioFileWrite(file, frameCount, &writeBufferList)
+                if writeStatus != noErr {
+                    self.logger.error("🎙️ ExtAudioFileWrite failed with status: \(writeStatus)")
+                }
+            }
         }
     }
 

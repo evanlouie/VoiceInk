@@ -74,7 +74,7 @@ class CustomModelManager: ObservableObject {
         if apiEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             errors.append("API endpoint cannot be empty")
         } else if !isValidURL(apiEndpoint) {
-            errors.append("API endpoint must be a valid URL")
+            errors.append("API endpoint must use HTTPS (HTTP is only allowed for localhost)")
         }
         
         if apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -107,7 +107,7 @@ class CustomModelManager: ObservableObject {
         if apiEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             errors.append("API endpoint cannot be empty")
         } else if !isValidURL(apiEndpoint) {
-            errors.append("API endpoint must be a valid URL")
+            errors.append("API endpoint must use HTTPS (HTTP is only allowed for localhost)")
         }
         
         if apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -127,9 +127,21 @@ class CustomModelManager: ObservableObject {
     }
     
     private func isValidURL(_ string: String) -> Bool {
-        if let url = URL(string: string) {
-            return (url.scheme == "https" || url.scheme == "http") && url.host != nil
+        guard let components = URLComponents(string: string.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let scheme = components.scheme?.lowercased(),
+              let host = components.host?.lowercased(),
+              !host.isEmpty else {
+            return false
         }
+
+        if scheme == "https" {
+            return true
+        }
+
+        if scheme == "http" {
+            return host == "localhost" || host == "127.0.0.1" || host == "::1"
+        }
+
         return false
     }
 } 

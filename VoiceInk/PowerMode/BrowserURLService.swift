@@ -106,7 +106,7 @@ class BrowserURLService {
 
         do {
             let output = try await runAppleScript(scriptURL: scriptURL, browser: browser)
-            logger.debug("✅ Successfully retrieved URL from \(browser.displayName): \(output)")
+            logger.debug("✅ Successfully retrieved URL from \(browser.displayName)")
             return output
         } catch let error as BrowserURLError {
             throw error
@@ -216,9 +216,18 @@ class BrowserURLService {
                     return
                 }
 
-                if output.hasPrefix("ERROR: ") {
+                if output.hasPrefix("ERROR:") {
                     self.logger.error("❌ AppleScript error for \(browser.displayName): \(output)")
-                    continuation.resume(throwing: BrowserURLError.executionFailed)
+                    let normalized = output.lowercased()
+                    if normalized.contains("browser_not_running") {
+                        continuation.resume(throwing: BrowserURLError.browserNotRunning)
+                    } else if normalized.contains("no_active_window") {
+                        continuation.resume(throwing: BrowserURLError.noActiveWindow)
+                    } else if normalized.contains("no_active_tab") {
+                        continuation.resume(throwing: BrowserURLError.noActiveTab)
+                    } else {
+                        continuation.resume(throwing: BrowserURLError.executionFailed)
+                    }
                     return
                 }
 

@@ -178,13 +178,18 @@ struct OnboardingModelDownloadView: View {
             withAnimation {
                 isDownloading = true
             }
-            Task {
+            Task { @MainActor in
+                defer {
+                    withAnimation {
+                        isDownloading = false
+                    }
+                }
+
                 await whisperState.downloadModel(turboModel)
                 if let modelToSet = whisperState.allAvailableModels.first(where: { $0.name == turboModel.name }) {
                     await whisperState.setDefaultTranscriptionModel(modelToSet)
                     withAnimation {
                         isModelSet = true
-                        isDownloading = false
                     }
                 }
             }

@@ -237,12 +237,9 @@ struct VoiceInkApp: App {
                         }
                         
                         // Process any pending open-file request now that the main ContentView is ready.
-                        if let pendingURL = appDelegate.pendingOpenFileURL {
+                        if let pendingURL = AudioTranscriptionManager.shared.pendingOpenFileURL {
                             NotificationCenter.default.post(name: .navigateToDestination, object: nil, userInfo: ["destination": "Transcribe Audio"])
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                NotificationCenter.default.post(name: .openFileForTranscription, object: nil, userInfo: ["url": pendingURL])
-                            }
-                            appDelegate.pendingOpenFileURL = nil
+                            NotificationCenter.default.post(name: .openFileForTranscription, object: nil, userInfo: ["url": pendingURL])
                         }
                     }
                     .background(WindowAccessor { window in

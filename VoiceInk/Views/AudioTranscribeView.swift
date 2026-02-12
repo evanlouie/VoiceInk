@@ -54,6 +54,15 @@ struct AudioTranscribeView: View {
             if let url = notification.userInfo?["url"] as? URL {
                 // Do not auto-start; only select file for manual transcription
                 validateAndSetAudioFile(url)
+                transcriptionManager.clearPendingOpenFile()
+            }
+        }
+        .onAppear {
+            processPendingOpenFileIfNeeded()
+        }
+        .onChange(of: transcriptionManager.pendingOpenFileURL) { _, newValue in
+            if newValue != nil {
+                processPendingOpenFileIfNeeded()
             }
         }
     }
@@ -288,6 +297,11 @@ struct AudioTranscribeView: View {
         print("File validated successfully: \(url.lastPathComponent)")
         selectedAudioURL = url
         isAudioFileSelected = true
+    }
+
+    private func processPendingOpenFileIfNeeded() {
+        guard let queuedURL = transcriptionManager.consumePendingOpenFile() else { return }
+        validateAndSetAudioFile(queuedURL)
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {

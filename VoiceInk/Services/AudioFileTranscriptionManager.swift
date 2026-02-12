@@ -12,6 +12,7 @@ class AudioTranscriptionManager: ObservableObject {
     @Published var processingPhase: ProcessingPhase = .idle
     @Published var currentTranscription: Transcription?
     @Published var errorMessage: String?
+    @Published private(set) var pendingOpenFileURL: URL?
     
     private var currentTask: Task<Void, Error>?
     private let audioProcessor = AudioProcessor()
@@ -44,6 +45,19 @@ class AudioTranscriptionManager: ObservableObject {
     }
     
     private init() {}
+
+    func queuePendingOpenFile(_ url: URL) {
+        pendingOpenFileURL = url
+    }
+
+    func consumePendingOpenFile() -> URL? {
+        defer { pendingOpenFileURL = nil }
+        return pendingOpenFileURL
+    }
+
+    func clearPendingOpenFile() {
+        pendingOpenFileURL = nil
+    }
     
     func startProcessing(url: URL, modelContext: ModelContext, whisperState: WhisperState) {
         // Cancel any existing processing

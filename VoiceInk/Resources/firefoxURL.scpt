@@ -1,25 +1,41 @@
+set previousClipboard to ""
+
+try
+	set previousClipboard to (the clipboard as text)
+on error
+	set previousClipboard to ""
+end try
+
 try
 	tell application "Firefox"
 		try
+			if not running then return "ERROR: BROWSER_NOT_RUNNING"
 			activate
 			delay 0.1
 			tell application "System Events"
-				try
-					keystroke "l" using command down
-					delay 0.1
-					keystroke "c" using command down
-					delay 0.1
-					keystroke tab
-				on error errMsg
-					return "ERROR: System Events failed: " & errMsg
-				end try
+				keystroke "l" using command down
+				delay 0.08
+				keystroke "c" using command down
 			end tell
-			delay 0.1
-			return (the clipboard as text)
+			delay 0.08
+			set currentURL to (the clipboard as text)
+
+			try
+				set the clipboard to previousClipboard
+			end try
+
+			if currentURL is "" then return "ERROR: NO_ACTIVE_TAB"
+			return currentURL
 		on error errMsg
-			return "ERROR: Firefox activation failed: " & errMsg
+			try
+				set the clipboard to previousClipboard
+			end try
+			return "ERROR: EXECUTION_FAILED: " & errMsg
 		end try
 	end tell
 on error errMsg
-	return "ERROR: Firefox application not available: " & errMsg
-end try 
+	try
+		set the clipboard to previousClipboard
+	end try
+	return "ERROR: EXECUTION_FAILED: " & errMsg
+end try
