@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 import os
 
-enum BrowserType {
+enum BrowserType: CaseIterable {
     case safari
     case arc
     case chrome
@@ -61,10 +61,6 @@ enum BrowserType {
         case .zen: return "Zen Browser"
         case .yandex: return "Yandex Browser"
         }
-    }
-    
-    static var allCases: [BrowserType] {
-        [.safari, .arc, .chrome, .edge, .brave, .opera, .vivaldi, .orion, .yandex]
     }
     
     static var installedBrowsers: [BrowserType] {
