@@ -5,9 +5,28 @@ struct TranscriptionOutputFilter {
     private static let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "TranscriptionOutputFilter")
     
     private static let hallucinationPatterns = [
-        #"\[.*?\]"#,     // []
-        #"\(.*?\)"#,     // ()
-        #"\{.*?\}"#      // {}
+        // Specific known whisper hallucination strings
+        #"\[BLANK_AUDIO\]"#,
+        #"\[BLANK AUDIO\]"#,
+        #"\[NO SPEECH\]"#,
+        #"\[Music\]"#,
+        #"\[music\]"#,
+        #"\[MUSIC PLAYING\]"#,
+        #"\[silence\]"#,
+        #"\[laughing\]"#,
+        #"\[applause\]"#,
+        #"\[inaudible\]"#,
+        #"\(upbeat music\)"#,
+        #"\(music playing\)"#,
+        #"\(soft music\)"#,
+        #"\(silence\)"#,
+        #"\(laughing\)"#,
+        #"\(applause\)"#,
+        #"\(engine revving\)"#,
+        #"\(no speech\)"#,
+        #"\(inaudible\)"#,
+        // <|...|> tag patterns
+        #"<\|[^|]*\|>"#,
     ]
 
     static func filter(_ text: String) -> String {
