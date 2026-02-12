@@ -87,9 +87,11 @@ class SoundManager: ObservableObject {
         guard isSoundFeedbackEnabled else { return }
 
         if let custom = customStartSound {
+            custom.currentTime = 0
             custom.play()
         } else {
             startSound?.volume = 0.4
+            startSound?.currentTime = 0
             startSound?.play()
         }
     }
@@ -98,9 +100,11 @@ class SoundManager: ObservableObject {
         guard isSoundFeedbackEnabled else { return }
 
         if let custom = customStopSound {
+            custom.currentTime = 0
             custom.play()
         } else {
             stopSound?.volume = 0.4
+            stopSound?.currentTime = 0
             stopSound?.play()
         }
     }
@@ -108,6 +112,7 @@ class SoundManager: ObservableObject {
     func playEscSound() {
         guard isSoundFeedbackEnabled else { return }
         escSound?.volume = 0.3
+        escSound?.currentTime = 0
         escSound?.play()
     }
     
