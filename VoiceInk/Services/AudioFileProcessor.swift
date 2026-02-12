@@ -86,12 +86,19 @@ class AudioProcessor {
                 }
                 
                 var error: NSError?
+                var hasData = true
                 let status = converter.convert(
                     to: outputBuffer,
                     error: &error,
                     withInputFrom: { inNumPackets, outStatus in
-                        outStatus.pointee = .haveData
-                        return inputBuffer
+                        if hasData {
+                            hasData = false
+                            outStatus.pointee = .haveData
+                            return inputBuffer
+                        } else {
+                            outStatus.pointee = .noDataNow
+                            return nil
+                        }
                     }
                 )
                 
@@ -183,4 +190,3 @@ class AudioProcessor {
         try audioFile.write(from: buffer)
     }
 } 
-
