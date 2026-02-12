@@ -1,4 +1,19 @@
 import Foundation
+import CryptoKit
+
+extension UUID {
+    /// Creates a deterministic UUID (v5-like) from a stable name string using SHA-256.
+    static func stable(from name: String) -> UUID {
+        let hash = SHA256.hash(data: Data(name.utf8))
+        let h = Array(hash)
+        return UUID(uuid: (
+            h[0], h[1], h[2], h[3],
+            h[4], h[5], (h[6] & 0x0F) | 0x50, h[7],
+            (h[8] & 0x3F) | 0x80, h[9], h[10], h[11],
+            h[12], h[13], h[14], h[15]
+        ))
+    }
+}
 
 // Enum to differentiate between model providers
 enum ModelProvider: String, Codable, Hashable, CaseIterable {
@@ -41,7 +56,7 @@ extension TranscriptionModel {
 
 // A new struct for Apple's native models
 struct NativeAppleModel: TranscriptionModel {
-    let id = UUID()
+    var id: UUID { .stable(from: "NativeAppleModel.\(name)") }
     let name: String
     let displayName: String
     let description: String
@@ -52,7 +67,7 @@ struct NativeAppleModel: TranscriptionModel {
 
 // A new struct for Parakeet models
 struct ParakeetModel: TranscriptionModel {
-    let id = UUID()
+    var id: UUID { .stable(from: "ParakeetModel.\(name)") }
     let name: String
     let displayName: String
     let description: String
@@ -156,7 +171,7 @@ struct CustomCloudModel: TranscriptionModel, Codable {
 } 
 
 struct LocalModel: TranscriptionModel {
-    let id = UUID()
+    var id: UUID { .stable(from: "LocalModel.\(name)") }
     let name: String
     let displayName: String
     let size: String
@@ -182,7 +197,7 @@ struct LocalModel: TranscriptionModel {
 
 // User-imported local models 
 struct ImportedLocalModel: TranscriptionModel {
-    let id = UUID()
+    var id: UUID { .stable(from: "ImportedLocalModel.\(name)") }
     let name: String
     let displayName: String
     let description: String
