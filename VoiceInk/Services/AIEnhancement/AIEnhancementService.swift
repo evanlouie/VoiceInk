@@ -207,7 +207,13 @@ class AIEnhancementService: ObservableObject {
             return "" // Silently return empty string instead of throwing error
         }
 
-        let formattedText = "\n<TRANSCRIPT>\n\(text)\n</TRANSCRIPT>"
+        let sanitizedText = text
+            .replacingOccurrences(of: "</TRANSCRIPT>", with: "</\u{200B}TRANSCRIPT>", options: .caseInsensitive)
+            .replacingOccurrences(of: "</CLIPBOARD_CONTEXT>", with: "</\u{200B}CLIPBOARD_CONTEXT>", options: .caseInsensitive)
+            .replacingOccurrences(of: "</CURRENT_WINDOW_CONTEXT>", with: "</\u{200B}CURRENT_WINDOW_CONTEXT>", options: .caseInsensitive)
+            .replacingOccurrences(of: "</CURRENTLY_SELECTED_TEXT>", with: "</\u{200B}CURRENTLY_SELECTED_TEXT>", options: .caseInsensitive)
+            .replacingOccurrences(of: "</CUSTOM_VOCABULARY>", with: "</\u{200B}CUSTOM_VOCABULARY>", options: .caseInsensitive)
+        let formattedText = "\n<TRANSCRIPT>\n\(sanitizedText)\n</TRANSCRIPT>"
         let systemMessage = await getSystemMessage(for: mode)
         
         // Persist the exact payload being sent (also used for UI)

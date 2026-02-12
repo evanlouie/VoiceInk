@@ -46,11 +46,15 @@ class VoiceInkCSVExportService {
     }
 
     private func escapeCSVString(_ string: String) -> String {
-        let escapedString = string.replacingOccurrences(of: "\"", with: "\"\"")
-        if escapedString.contains(",") || escapedString.contains("\n") {
-            return "\"\(escapedString)\""
+        var escaped = string.replacingOccurrences(of: "\"", with: "\"\"")
+        // Sanitize formula injection: prefix dangerous leading characters with a single quote
+        if let first = escaped.first, "=+-@\t\r".contains(first) {
+            escaped = "'" + escaped
         }
-        return escapedString
+        if escaped.contains(",") || escaped.contains("\n") || escaped.contains("\"") {
+            return "\"\(escaped)\""
+        }
+        return escaped
     }
 
     private func powerModeDisplay(name: String?, emoji: String?) -> String {
