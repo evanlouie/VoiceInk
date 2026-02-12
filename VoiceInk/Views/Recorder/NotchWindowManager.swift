@@ -21,12 +21,14 @@ class NotchWindowManager: ObservableObject {
         )
     }
     
-    deinit {
+    nonisolated deinit {
         NotificationCenter.default.removeObserver(self)
     }
     
-    @objc private func handleHideNotification() {
-        hide()
+    @objc private nonisolated func handleHideNotification() {
+        Task { @MainActor in
+            self.hide()
+        }
     }
     
     func show() {
@@ -58,10 +60,14 @@ class NotchWindowManager: ObservableObject {
         
         let notchRecorderView = NotchRecorderView(whisperState: whisperState, recorder: recorder)
             .environmentObject(self)
-            .environmentObject(whisperState.enhancementService!)
         
-        let hostingController = NotchRecorderHostingController(rootView: notchRecorderView)
-        panel.contentView = hostingController.view
+        if let enhancementService = whisperState.enhancementService {
+            let hostingController = NotchRecorderHostingController(rootView: notchRecorderView.environmentObject(enhancementService))
+            panel.contentView = hostingController.view
+        } else {
+            let hostingController = NotchRecorderHostingController(rootView: notchRecorderView)
+            panel.contentView = hostingController.view
+        }
         
         self.notchPanel = panel
         self.windowController = NSWindowController(window: panel)
