@@ -52,39 +52,11 @@ class TranscriptionAutoCleanupService {
         let isEnabled = UserDefaults.standard.bool(forKey: keyIsEnabled)
         guard isEnabled else { return }
 
-        let minutes = UserDefaults.standard.integer(forKey: keyRetentionMinutes)
-        if minutes > 0 {
-            if let modelContext = self.modelContext {
-                Task { [weak self] in
-                    guard let self = self else { return }
-                    await self.sweepOldTranscriptions(modelContext: modelContext)
-                }
+        if let modelContext = self.modelContext {
+            Task { [weak self] in
+                guard let self = self else { return }
+                await self.sweepOldTranscriptions(modelContext: modelContext)
             }
-            return
-        }
-
-        guard let transcription = notification.object as? Transcription,
-              let modelContext = self.modelContext else {
-            logger.error("Invalid transcription or missing model context")
-            return
-        }
-
-        if let urlString = transcription.audioFileURL,
-           let url = URL(string: urlString) {
-            do {
-                try FileManager.default.removeItem(at: url)
-            } catch {
-                logger.error("Failed to delete audio file: \(error.localizedDescription)")
-            }
-        }
-
-        modelContext.delete(transcription)
-
-        do {
-            try modelContext.save()
-            NotificationCenter.default.post(name: .transcriptionDeleted, object: nil)
-        } catch {
-            logger.error("Failed to save after transcription deletion: \(error.localizedDescription)")
         }
     }
 
@@ -94,7 +66,7 @@ class TranscriptionAutoCleanupService {
         }
 
         let retentionMinutes = UserDefaults.standard.integer(forKey: keyRetentionMinutes)
-        let effectiveMinutes = max(retentionMinutes, 0)
+        let effectiveMinutes = max(retentionMinutes, 1)
 
         let cutoffDate = Date().addingTimeInterval(TimeInterval(-effectiveMinutes * 60))
 
