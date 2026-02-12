@@ -127,7 +127,7 @@ struct CustomPrompt: Identifiable, Codable, Equatable {
     
     var finalPromptText: String {
         if useSystemInstructions {
-            return String(format: AIPrompts.customPromptTemplate, self.promptText)
+            return AIPrompts.customPromptTemplate.replacingOccurrences(of: "%@", with: self.promptText)
         } else {
             return self.promptText
         }
