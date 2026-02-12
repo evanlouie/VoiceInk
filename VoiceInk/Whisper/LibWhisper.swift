@@ -14,6 +14,7 @@ actor WhisperContext {
     private var prompt: String?
     private var promptCString: [CChar]?
     private var vadModelPath: String?
+    private var vadModelPathNSString: NSString?
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "WhisperContext")
 
     private init() {}
@@ -38,19 +39,13 @@ actor WhisperContext {
         let selectedLanguage = UserDefaults.standard.string(forKey: "SelectedLanguage") ?? "auto"
         if selectedLanguage != "auto" {
             languageCString = Array(selectedLanguage.utf8CString)
-            params.language = languageCString?.withUnsafeBufferPointer { ptr in
-                ptr.baseAddress
-            }
         } else {
             languageCString = nil
             params.language = nil
         }
         
-        if prompt != nil {
-            promptCString = Array(prompt!.utf8CString)
-            params.initial_prompt = promptCString?.withUnsafeBufferPointer { ptr in
-                ptr.baseAddress
-            }
+        if let prompt = prompt {
+            promptCString = Array(prompt.utf8CString)
         } else {
             promptCString = nil
             params.initial_prompt = nil
@@ -73,7 +68,10 @@ actor WhisperContext {
         let isVADEnabled = UserDefaults.standard.bool(forKey: "IsVADEnabled")
         if isVADEnabled, let vadModelPath = self.vadModelPath {
             params.vad = true
-            params.vad_model_path = (vadModelPath as NSString).utf8String
+            // Store NSString to keep the utf8String pointer alive for the duration of this call
+            let nsPath = vadModelPath as NSString
+            self.vadModelPathNSString = nsPath
+            params.vad_model_path = nsPath.utf8String
             
             var vadParams = whisper_vad_default_params()
             vadParams.threshold = 0.50
@@ -87,16 +85,45 @@ actor WhisperContext {
             params.vad = false
         }
         
+        // Nest whisper_full inside withUnsafeBufferPointer closures so
+        // the C pointers remain valid for the entire duration of the call.
         var success = true
-        samples.withUnsafeBufferPointer { samplesBuffer in
-            if whisper_full(context, params, samplesBuffer.baseAddress, Int32(samplesBuffer.count)) != 0 {
-                logger.error("Failed to run whisper_full. VAD enabled: \(params.vad)")
-                success = false
+        
+        func runWhisper(_ params: inout whisper_full_params) {
+            let vadEnabled = params.vad
+            samples.withUnsafeBufferPointer { samplesBuffer in
+                if whisper_full(context, params, samplesBuffer.baseAddress, Int32(samplesBuffer.count)) != 0 {
+                    logger.error("Failed to run whisper_full. VAD enabled: \(vadEnabled)")
+                    success = false
+                }
             }
+        }
+        
+        if let langCString = languageCString, let promptCString = promptCString {
+            langCString.withUnsafeBufferPointer { langBuf in
+                promptCString.withUnsafeBufferPointer { promptBuf in
+                    params.language = langBuf.baseAddress
+                    params.initial_prompt = promptBuf.baseAddress
+                    runWhisper(&params)
+                }
+            }
+        } else if let langCString = languageCString {
+            langCString.withUnsafeBufferPointer { langBuf in
+                params.language = langBuf.baseAddress
+                runWhisper(&params)
+            }
+        } else if let promptCString = promptCString {
+            promptCString.withUnsafeBufferPointer { promptBuf in
+                params.initial_prompt = promptBuf.baseAddress
+                runWhisper(&params)
+            }
+        } else {
+            runWhisper(&params)
         }
         
         languageCString = nil
         promptCString = nil
+        vadModelPathNSString = nil
         
         return success
     }
@@ -105,7 +132,8 @@ actor WhisperContext {
         guard let context = context else { return "" }
         var transcription = ""
         for i in 0..<whisper_full_n_segments(context) {
-            transcription += String(cString: whisper_full_get_segment_text(context, i))
+            guard let segmentText = whisper_full_get_segment_text(context, i) else { continue }
+            transcription += String(cString: segmentText)
         }
         return transcription
     }
