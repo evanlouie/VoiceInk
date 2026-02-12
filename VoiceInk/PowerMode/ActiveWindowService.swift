@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import os
 
+@MainActor
 class ActiveWindowService: ObservableObject {
     static let shared = ActiveWindowService()
     @Published var currentApplication: NSRunningApplication?

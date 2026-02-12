@@ -11,6 +11,7 @@ class DeepgramTranscriptionService {
         request.httpMethod = "POST"
         request.setValue("Token \(config.apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("audio/wav", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 120
         
         guard let audioData = try? Data(contentsOf: audioURL) else {
             throw CloudTranscriptionError.audioFileNotFound

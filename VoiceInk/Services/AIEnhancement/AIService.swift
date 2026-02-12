@@ -152,6 +152,7 @@ enum AIProvider: String, CaseIterable {
     }
 }
 
+@MainActor
 class AIService: ObservableObject {
     @Published var apiKey: String = ""
     @Published var isAPIKeyValid: Bool = false
@@ -330,7 +331,10 @@ class AIService: ObservableObject {
     }
     
     private func verifyOpenAICompatibleAPIKey(_ key: String, completion: @escaping (Bool, String?) -> Void) {
-        let url = URL(string: selectedProvider.baseURL)!
+        guard let url = URL(string: selectedProvider.baseURL), url.scheme == "https" || url.scheme == "http" else {
+            completion(false, "Invalid or missing API endpoint URL")
+            return
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -370,7 +374,10 @@ class AIService: ObservableObject {
     }
     
     private func verifyAnthropicAPIKey(_ key: String, completion: @escaping (Bool, String?) -> Void) {
-        let url = URL(string: selectedProvider.baseURL)!
+        guard let url = URL(string: selectedProvider.baseURL), url.scheme == "https" || url.scheme == "http" else {
+            completion(false, "Invalid or missing API endpoint URL")
+            return
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")

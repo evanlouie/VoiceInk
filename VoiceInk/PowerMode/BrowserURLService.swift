@@ -74,6 +74,7 @@ enum BrowserType: CaseIterable {
 enum BrowserURLError: Error {
     case scriptNotFound
     case executionFailed
+    case executionTimedOut
     case browserNotRunning
     case noActiveWindow
     case noActiveTab
@@ -102,44 +103,11 @@ class BrowserURLService {
             logger.error("❌ Browser not running: \(browser.displayName)")
             throw BrowserURLError.browserNotRunning
         }
-        
-        let task = Process()
-        task.launchPath = "/usr/bin/osascript"
-        task.arguments = [scriptURL.path]
-        
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = pipe
-        
+
         do {
-            logger.debug("▶️ Executing AppleScript for \(browser.displayName)")
-            try task.run()
-            
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                task.terminationHandler = { _ in
-                    continuation.resume()
-                }
-            }
-            
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                if output.isEmpty {
-                    logger.error("❌ Empty output from AppleScript for \(browser.displayName)")
-                    throw BrowserURLError.noActiveTab
-                }
-                
-                // Check process exit code and AppleScript error prefix
-                if task.terminationStatus != 0 || output.hasPrefix("ERROR: ") {
-                    logger.error("❌ AppleScript error for \(browser.displayName): \(output)")
-                    throw BrowserURLError.executionFailed
-                }
-                
-                logger.debug("✅ Successfully retrieved URL from \(browser.displayName): \(output)")
-                return output
-            } else {
-                logger.error("❌ Failed to decode output from AppleScript for \(browser.displayName)")
-                throw BrowserURLError.executionFailed
-            }
+            let output = try await runAppleScript(scriptURL: scriptURL, browser: browser)
+            logger.debug("✅ Successfully retrieved URL from \(browser.displayName): \(output)")
+            return output
         } catch let error as BrowserURLError {
             throw error
         } catch {
@@ -154,5 +122,108 @@ class BrowserURLService {
         let isRunning = runningApps.contains { $0.bundleIdentifier == browser.bundleIdentifier }
         logger.debug("\(browser.displayName) running status: \(isRunning)")
         return isRunning
+    }
+
+    private func runAppleScript(scriptURL: URL, browser: BrowserType) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                let task = Process()
+                task.launchPath = "/usr/bin/osascript"
+                task.arguments = [scriptURL.path]
+
+                let stdoutPipe = Pipe()
+                let stderrPipe = Pipe()
+                task.standardOutput = stdoutPipe
+                task.standardError = stderrPipe
+
+                var stdoutData = Data()
+                var stderrData = Data()
+                let stdoutLock = NSLock()
+                let stderrLock = NSLock()
+
+                stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    guard !data.isEmpty else { return }
+                    stdoutLock.lock()
+                    stdoutData.append(data)
+                    stdoutLock.unlock()
+                }
+
+                stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    guard !data.isEmpty else { return }
+                    stderrLock.lock()
+                    stderrData.append(data)
+                    stderrLock.unlock()
+                }
+
+                let timeoutSeconds: TimeInterval = 5
+                let terminationGroup = DispatchGroup()
+                terminationGroup.enter()
+                task.terminationHandler = { _ in
+                    terminationGroup.leave()
+                }
+
+                do {
+                    self.logger.debug("▶️ Executing AppleScript for \(browser.displayName)")
+                    try task.run()
+                } catch {
+                    stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                    stderrPipe.fileHandleForReading.readabilityHandler = nil
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                let waitResult = terminationGroup.wait(timeout: .now() + timeoutSeconds)
+                if waitResult == .timedOut {
+                    task.terminate()
+                    stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                    stderrPipe.fileHandleForReading.readabilityHandler = nil
+                    self.logger.error("❌ AppleScript timed out for \(browser.displayName)")
+                    continuation.resume(throwing: BrowserURLError.executionTimedOut)
+                    return
+                }
+
+                stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                stderrPipe.fileHandleForReading.readabilityHandler = nil
+
+                stdoutLock.lock()
+                stdoutData.append(stdoutPipe.fileHandleForReading.readDataToEndOfFile())
+                stdoutLock.unlock()
+
+                stderrLock.lock()
+                stderrData.append(stderrPipe.fileHandleForReading.readDataToEndOfFile())
+                stderrLock.unlock()
+
+                if task.terminationStatus != 0 {
+                    if let stderrText = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                       !stderrText.isEmpty {
+                        self.logger.error("❌ AppleScript stderr for \(browser.displayName): \(stderrText)")
+                    }
+                    continuation.resume(throwing: BrowserURLError.executionFailed)
+                    return
+                }
+
+                guard let output = String(data: stdoutData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+                    self.logger.error("❌ Failed to decode output from AppleScript for \(browser.displayName)")
+                    continuation.resume(throwing: BrowserURLError.executionFailed)
+                    return
+                }
+
+                if output.isEmpty {
+                    self.logger.error("❌ Empty output from AppleScript for \(browser.displayName)")
+                    continuation.resume(throwing: BrowserURLError.noActiveTab)
+                    return
+                }
+
+                if output.hasPrefix("ERROR: ") {
+                    self.logger.error("❌ AppleScript error for \(browser.displayName): \(output)")
+                    continuation.resume(throwing: BrowserURLError.executionFailed)
+                    return
+                }
+
+                continuation.resume(returning: output)
+            }
+        }
     }
 } 

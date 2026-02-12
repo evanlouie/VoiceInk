@@ -128,7 +128,7 @@ class CustomModelManager: ObservableObject {
     
     private func isValidURL(_ string: String) -> Bool {
         if let url = URL(string: string) {
-            return url.scheme != nil && url.host != nil
+            return (url.scheme == "https" || url.scheme == "http") && url.host != nil
         }
         return false
     }

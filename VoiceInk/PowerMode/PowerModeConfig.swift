@@ -96,7 +96,22 @@ struct PowerModeConfig: Codable, Identifiable, Equatable {
     
     
     static func == (lhs: PowerModeConfig, rhs: PowerModeConfig) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id &&
+        lhs.name == rhs.name &&
+        lhs.emoji == rhs.emoji &&
+        lhs.isAIEnhancementEnabled == rhs.isAIEnhancementEnabled &&
+        lhs.selectedPrompt == rhs.selectedPrompt &&
+        lhs.selectedTranscriptionModelName == rhs.selectedTranscriptionModelName &&
+        lhs.selectedLanguage == rhs.selectedLanguage &&
+        lhs.useScreenCapture == rhs.useScreenCapture &&
+        lhs.selectedAIProvider == rhs.selectedAIProvider &&
+        lhs.selectedAIModel == rhs.selectedAIModel &&
+        lhs.isAutoSendEnabled == rhs.isAutoSendEnabled &&
+        lhs.isEnabled == rhs.isEnabled &&
+        lhs.isDefault == rhs.isDefault &&
+        lhs.hotkeyShortcut == rhs.hotkeyShortcut &&
+        lhs.appConfigs == rhs.appConfigs &&
+        lhs.urlConfigs == rhs.urlConfigs
     }
 }
 

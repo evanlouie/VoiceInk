@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 class FillerWordManager: ObservableObject {
     static let shared = FillerWordManager()
 

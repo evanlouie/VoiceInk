@@ -13,6 +13,7 @@ enum CloudTranscriptionRetry {
         var currentDelay = initialDelay
 
         while true {
+            try Task.checkCancellation()
             do {
                 return try await operation()
             } catch let error as CloudTranscriptionError {

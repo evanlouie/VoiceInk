@@ -73,7 +73,7 @@ class AIEnhancementService: ObservableObject {
     
     @Published var lastCapturedClipboard: String?
 
-    init(aiService: AIService = AIService(), modelContext: ModelContext) {
+    init(aiService: AIService, modelContext: ModelContext) {
         self.aiService = aiService
         self.modelContext = modelContext
         self.screenCaptureService = ScreenCaptureService()
@@ -113,7 +113,8 @@ class AIEnhancementService: ObservableObject {
     }
 
     @objc private func handleAPIKeyChange() {
-        DispatchQueue.main.async {
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
             self.objectWillChange.send()
             if !self.aiService.isAPIKeyValid {
                 self.isEnhancementEnabled = false

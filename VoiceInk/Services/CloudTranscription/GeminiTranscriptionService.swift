@@ -13,6 +13,7 @@ class GeminiTranscriptionService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(config.apiKey, forHTTPHeaderField: "x-goog-api-key")
+        request.timeoutInterval = 120
         
         guard let audioData = try? Data(contentsOf: audioURL) else {
             throw CloudTranscriptionError.audioFileNotFound

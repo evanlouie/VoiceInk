@@ -29,6 +29,7 @@ struct TranscriptionOutputFilter {
         #"<\|[^|]*\|>"#,
     ]
 
+    @MainActor
     static func filter(_ text: String) -> String {
         var filteredText = text
 

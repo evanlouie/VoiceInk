@@ -26,13 +26,12 @@ class PowerModeSessionManager {
     private var whisperState: WhisperState?
     private var enhancementService: AIEnhancementService?
 
-    private init() {
-        recoverSession()
-    }
+    private init() {}
 
     func configure(whisperState: WhisperState, enhancementService: AIEnhancementService) {
         self.whisperState = whisperState
         self.enhancementService = enhancementService
+        recoverSession()
     }
 
     func beginSession(with config: PowerModeConfig) async {
@@ -86,6 +85,13 @@ class PowerModeSessionManager {
     }
     
     @objc func updateSessionSnapshot() {
+        // Ensure we're on the main actor since this can be called from NotificationCenter on any thread
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.updateSessionSnapshot()
+            }
+            return
+        }
         guard !isApplyingPowerModeConfig else { return }
         
         guard var session = loadSession(), let whisperState = whisperState, let enhancementService = enhancementService else { return }

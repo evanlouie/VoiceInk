@@ -96,7 +96,7 @@ class ImportExportService {
         var exportedWordReplacements: [String: String]? = nil
         let replacementsDescriptor = FetchDescriptor<WordReplacement>()
         if let replacements = try? whisperState.modelContext.fetch(replacementsDescriptor), !replacements.isEmpty {
-            exportedWordReplacements = Dictionary(uniqueKeysWithValues: replacements.map { ($0.originalText, $0.replacementText) })
+            exportedWordReplacements = Dictionary(replacements.map { ($0.originalText, $0.replacementText) }, uniquingKeysWith: { _, latest in latest })
         }
 
         let generalSettingsToExport = GeneralSettings(

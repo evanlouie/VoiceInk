@@ -116,6 +116,7 @@ class SonioxTranscriptionService {
         let start = Date()
         let maxWaitSeconds: TimeInterval = 300
         while true {
+            try Task.checkCancellation()
             var request = URLRequest(url: baseURL)
             request.httpMethod = "GET"
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")

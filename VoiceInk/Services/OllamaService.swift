@@ -57,7 +57,7 @@ class OllamaService: ObservableObject {
     
     @MainActor
     func checkConnection() async {
-        guard let url = URL(string: baseURL) else {
+        guard let url = URL(string: baseURL), url.scheme == "https" || url.scheme == "http" else {
             isConnected = false
             return
         }
@@ -94,7 +94,7 @@ class OllamaService: ObservableObject {
     }
     
     private func fetchAvailableModels() async throws -> [OllamaModel] {
-        guard let url = URL(string: "\(baseURL)/api/tags") else {
+        guard let url = URL(string: "\(baseURL)/api/tags"), url.scheme == "https" || url.scheme == "http" else {
             throw LocalAIError.invalidURL
         }
         
@@ -104,7 +104,7 @@ class OllamaService: ObservableObject {
     }
     
     func enhance(_ text: String, withSystemPrompt systemPrompt: String? = nil) async throws -> String {
-        guard let url = URL(string: "\(baseURL)/api/generate") else {
+        guard let url = URL(string: "\(baseURL)/api/generate"), url.scheme == "https" || url.scheme == "http" else {
             throw LocalAIError.invalidURL
         }
         

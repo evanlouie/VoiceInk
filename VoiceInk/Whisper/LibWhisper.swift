@@ -181,6 +181,8 @@ actor WhisperContext {
             self.context = nil
         }
         languageCString = nil
+        prompt = nil
+        promptCString = nil
     }
 
     func setPrompt(_ prompt: String?) {

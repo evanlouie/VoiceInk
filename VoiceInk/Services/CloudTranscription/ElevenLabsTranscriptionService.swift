@@ -16,6 +16,7 @@ class ElevenLabsTranscriptionService {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(apiKey, forHTTPHeaderField: "xi-api-key")
+        request.timeoutInterval = 120
         
         let body = try createRequestBody(audioURL: audioURL, modelName: model.name, boundary: boundary)
         

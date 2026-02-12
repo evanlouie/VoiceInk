@@ -124,9 +124,10 @@ final class CoreAudioRecorder {
         }
         logger.notice("stopRecording: stopping core audio recorder")
 
-        // Stop and dispose AudioUnit
+        // Stop, uninitialize, and dispose AudioUnit
         if let unit = audioUnit {
             AudioOutputUnitStop(unit)
+            AudioUnitUninitialize(unit)
             AudioComponentInstanceDispose(unit)
             audioUnit = nil
         }
@@ -397,6 +398,20 @@ final class CoreAudioRecorder {
         if status != noErr {
             logger.error("Failed to disable audio output: \(status)")
             throw CoreAudioRecorderError.failedToDisableOutput(status: status)
+        }
+
+        // Enforce maximum frames per slice so our 4096-frame buffer assumption holds
+        var maxFrames: UInt32 = 4096
+        status = AudioUnitSetProperty(
+            audioUnit,
+            kAudioUnitProperty_MaximumFramesPerSlice,
+            kAudioUnitScope_Global,
+            0,
+            &maxFrames,
+            UInt32(MemoryLayout<UInt32>.size)
+        )
+        if status != noErr {
+            logger.warning("Failed to set MaximumFramesPerSlice: \(status)")
         }
     }
 

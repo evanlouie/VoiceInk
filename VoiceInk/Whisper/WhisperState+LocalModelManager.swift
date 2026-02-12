@@ -79,6 +79,10 @@ extension WhisperState {
     // MARK: - Model Loading
     
     func loadModel(_ model: WhisperModel) async throws {
+        // If a different model is already loaded, unload it first
+        if whisperContext != nil && loadedLocalModel?.name != model.name {
+            await cleanupModelResources()
+        }
         guard whisperContext == nil, !isModelLoading else { return }
         
         isModelLoading = true
@@ -268,6 +272,11 @@ extension WhisperState {
     }
     
     func deleteModel(_ model: WhisperModel) async {
+        // Unload whisperContext if this is the currently loaded model
+        if loadedLocalModel?.name == model.name {
+            await cleanupModelResources()
+        }
+
         do {
             // Delete main model file
             try FileManager.default.removeItem(at: model.url)

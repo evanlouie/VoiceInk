@@ -16,6 +16,7 @@ class MistralTranscriptionService {
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 120
 
         let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -46,7 +47,7 @@ class MistralTranscriptionService {
         do {
             let data = try await CloudTranscriptionRetry.withRetry {
                 let (data, response) = try await URLSession.shared.data(for: request)
-                guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
                     let errorResponse = String(data: data, encoding: .utf8) ?? "No response body"
                     self.logger.error("Mistral transcription request failed with status code \((response as? HTTPURLResponse)?.statusCode ?? 500): \(errorResponse)")
                     throw CloudTranscriptionError.apiRequestFailed(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 500, message: errorResponse)

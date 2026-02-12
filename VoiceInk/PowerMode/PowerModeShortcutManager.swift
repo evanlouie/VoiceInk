@@ -41,10 +41,13 @@ class PowerModeShortcutManager {
             registeredPowerModeIds.remove(id)
         }
 
-        // Add new shortcuts
+        // Add or re-register shortcuts (re-register to pick up changed shortcut keys)
         PowerModeManager.shared.configurations.forEach { config in
             guard config.hotkeyShortcut != nil else { return }
-            guard !registeredPowerModeIds.contains(config.id) else { return }
+            // Always re-register so shortcut key changes are picked up
+            if registeredPowerModeIds.contains(config.id) {
+                registeredPowerModeIds.remove(config.id)
+            }
 
             KeyboardShortcuts.onKeyUp(for: .powerMode(id: config.id)) { [weak self] in
                 guard let self = self else { return }
