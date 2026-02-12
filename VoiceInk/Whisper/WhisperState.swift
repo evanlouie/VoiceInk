@@ -291,7 +291,18 @@ class WhisperState: NSObject, ObservableObject {
     }
     
     private func requestRecordPermission(response: @escaping (Bool) -> Void) {
-        response(true)
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            response(true)
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                response(granted)
+            }
+        case .denied, .restricted:
+            response(false)
+        @unknown default:
+            response(false)
+        }
     }
     
     private func transcribeAudio(on transcription: Transcription) async {
@@ -413,7 +424,7 @@ class WhisperState: NSObject, ObservableObject {
                     transcription.aiRequestUserMessage = enhancementService.lastUserMessageSent
                     finalPastedText = enhancedText
                 } catch {
-                    transcription.enhancedText = "Enhancement failed: \(error)"
+                    transcription.enhancedText = "Enhancement failed. Please try again."
                   
                     if await checkCancellationAndCleanup() { return }
                 }
@@ -422,6 +433,7 @@ class WhisperState: NSObject, ObservableObject {
             transcription.transcriptionStatus = TranscriptionStatus.completed.rawValue
 
         } catch {
+            currentSession = nil
             let errorDescription = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             let recoverySuggestion = (error as? LocalizedError)?.recoverySuggestion ?? ""
             let fullErrorText = recoverySuggestion.isEmpty ? errorDescription : "\(errorDescription) \(recoverySuggestion)"

@@ -250,7 +250,9 @@ struct VoiceInkApp: App {
                     })
                     .onDisappear {
                         AnnouncementsService.shared.stop()
-                        whisperState.unloadModel()
+                        Task {
+                            await whisperState.unloadModel()
+                        }
                         
                         // Stop the transcription auto-cleanup service
                         transcriptionAutoCleanupService.stopMonitoring()

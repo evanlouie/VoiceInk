@@ -79,7 +79,7 @@ extension WhisperState {
     // MARK: - Model Loading
     
     func loadModel(_ model: WhisperModel) async throws {
-        guard whisperContext == nil else { return }
+        guard whisperContext == nil, !isModelLoading else { return }
         
         isModelLoading = true
         defer { isModelLoading = false }
@@ -114,7 +114,15 @@ extension WhisperState {
                 }
             }
 
+            // observation must be declared before the task so the completion handler
+            // can capture and invalidate it, keeping KVO alive for the entire download.
+            var observation: NSKeyValueObservation?
+
             let task = URLSession.shared.downloadTask(with: url) { tempURL, response, error in
+                // Invalidate KVO now that the download is complete.
+                observation?.invalidate()
+                observation = nil
+
                 if let error = error {
                     finishOnce(.failure(error))
                     return
@@ -147,7 +155,7 @@ extension WhisperState {
             var lastUpdateTime = Date()
             var lastProgressValue: Double = 0
 
-            let observation = task.progress.observe(\.fractionCompleted) { progress, _ in
+            observation = task.progress.observe(\.fractionCompleted) { progress, _ in
                 let currentTime = Date()
                 let timeSinceLastUpdate = currentTime.timeIntervalSince(lastUpdateTime)
                 let currentProgress = round(progress.fractionCompleted * 100) / 100
@@ -159,18 +167,6 @@ extension WhisperState {
                     DispatchQueue.main.async {
                         self.downloadProgress[progressKey] = currentProgress
                     }
-                }
-            }
-
-            Task {
-                await withTaskCancellationHandler {
-                    observation.invalidate()
-                    // Also ensure continuation is resumed with cancellation if task is cancelled
-                    if finished.exchange(true, ordering: .acquiring) == false {
-                        continuation.resume(throwing: CancellationError())
-                    }
-                } operation: {
-                    await withCheckedContinuation { (_: CheckedContinuation<Void, Never>) in }
                 }
             }
         }
@@ -310,13 +306,11 @@ extension WhisperState {
         }
     }
     
-    func unloadModel() {
-        Task {
-            await whisperContext?.releaseResources()
-            whisperContext = nil
-            isModelLoaded = false
-            self.recordedFile = nil
-        }
+    func unloadModel() async {
+        await whisperContext?.releaseResources()
+        whisperContext = nil
+        isModelLoaded = false
+        self.recordedFile = nil
     }
     
     func clearDownloadedModels() async {
