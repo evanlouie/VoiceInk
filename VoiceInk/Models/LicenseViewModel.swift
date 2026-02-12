@@ -107,9 +107,6 @@ class LicenseViewModel: ObservableObject {
                 isValidating = false
                 return
             }
-            
-            // Store the license key
-            licenseManager.licenseKey = licenseKey
 
             // Handle based on whether activation is required
             if licenseCheck.requiresActivation {
@@ -118,6 +115,7 @@ class LicenseViewModel: ObservableObject {
                     let isValid = try await polarService.validateLicenseKeyWithActivation(licenseKey, activationId: existingActivationId)
                     if isValid {
                         // Existing activation is valid
+                        licenseManager.licenseKey = licenseKey
                         licenseState = .licensed
                         validationMessage = "License activated successfully!"
                         NotificationCenter.default.post(name: .licenseStatusChanged, object: nil)
@@ -129,7 +127,8 @@ class LicenseViewModel: ObservableObject {
                 // Need to create a new activation
                 let (newActivationId, limit) = try await polarService.activateLicenseKey(licenseKey)
 
-                // Store activation details
+                // Store license key and activation details only after successful activation
+                licenseManager.licenseKey = licenseKey
                 licenseManager.activationId = newActivationId
                 userDefaults.set(true, forKey: "VoiceInkLicenseRequiresActivation")
                 self.activationsLimit = limit
@@ -137,6 +136,7 @@ class LicenseViewModel: ObservableObject {
 
             } else {
                 // This license doesn't require activation (unlimited devices)
+                licenseManager.licenseKey = licenseKey
                 licenseManager.activationId = nil
                 userDefaults.set(false, forKey: "VoiceInkLicenseRequiresActivation")
                 self.activationsLimit = licenseCheck.activationsLimit ?? 0
@@ -181,7 +181,7 @@ class LicenseViewModel: ObservableObject {
 
         // Reset UserDefaults flags
         userDefaults.set(false, forKey: "VoiceInkLicenseRequiresActivation")
-        userDefaults.set(false, forKey: "VoiceInkHasLaunchedBefore")  // Allow trial to restart
+        // Do NOT reset VoiceInkHasLaunchedBefore — preserving it prevents trial-reset exploits
         userDefaults.activationsLimit = 0
 
         licenseState = .trial(daysRemaining: trialPeriodDays)  // Reset to trial state
