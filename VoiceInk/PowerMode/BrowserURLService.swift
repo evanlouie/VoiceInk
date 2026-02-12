@@ -114,7 +114,12 @@ class BrowserURLService {
         do {
             logger.debug("▶️ Executing AppleScript for \(browser.displayName)")
             try task.run()
-            task.waitUntilExit()
+            
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                task.terminationHandler = { _ in
+                    continuation.resume()
+                }
+            }
             
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
@@ -123,8 +128,8 @@ class BrowserURLService {
                     throw BrowserURLError.noActiveTab
                 }
                 
-                // Check if output contains error messages
-                if output.lowercased().contains("error") {
+                // Check process exit code and AppleScript error prefix
+                if task.terminationStatus != 0 || output.hasPrefix("ERROR: ") {
                     logger.error("❌ AppleScript error for \(browser.displayName): \(output)")
                     throw BrowserURLError.executionFailed
                 }
@@ -135,6 +140,8 @@ class BrowserURLService {
                 logger.error("❌ Failed to decode output from AppleScript for \(browser.displayName)")
                 throw BrowserURLError.executionFailed
             }
+        } catch let error as BrowserURLError {
+            throw error
         } catch {
             logger.error("❌ AppleScript execution failed for \(browser.displayName): \(error.localizedDescription)")
             throw BrowserURLError.executionFailed
