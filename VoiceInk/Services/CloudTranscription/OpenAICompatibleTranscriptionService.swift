@@ -23,15 +23,17 @@ class OpenAICompatibleTranscriptionService {
         
         let body = try createOpenAICompatibleRequestBody(audioURL: audioURL, modelName: config.modelName, boundary: boundary)
         
-        let (data, response) = try await URLSession.shared.upload(for: request, from: body)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw CloudTranscriptionError.networkError(URLError(.badServerResponse))
-        }
-        
-        if !(200...299).contains(httpResponse.statusCode) {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
-            logger.error("OpenAI-compatible API request failed with status \(httpResponse.statusCode): \(errorMessage, privacy: .public)")
-            throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
+        let data = try await CloudTranscriptionRetry.withRetry {
+            let (data, response) = try await URLSession.shared.upload(for: request, from: body)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw CloudTranscriptionError.networkError(URLError(.badServerResponse))
+            }
+            if !(200...299).contains(httpResponse.statusCode) {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
+                self.logger.error("OpenAI-compatible API request failed with status \(httpResponse.statusCode): \(errorMessage, privacy: .public)")
+                throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
+            }
+            return data
         }
         
         do {

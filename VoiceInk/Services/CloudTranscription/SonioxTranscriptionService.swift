@@ -40,13 +40,16 @@ class SonioxTranscriptionService {
         let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         let body = try createMultipartBody(fileURL: audioURL, boundary: boundary)
-        let (data, response) = try await URLSession.shared.upload(for: request, from: body)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw CloudTranscriptionError.networkError(URLError(.badServerResponse))
-        }
-        if !(200...299).contains(httpResponse.statusCode) {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
-            throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
+        let data = try await CloudTranscriptionRetry.withRetry {
+            let (data, response) = try await URLSession.shared.upload(for: request, from: body)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw CloudTranscriptionError.networkError(URLError(.badServerResponse))
+            }
+            if !(200...299).contains(httpResponse.statusCode) {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
+                throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
+            }
+            return data
         }
         do {
             let uploadResponse = try JSONDecoder().decode(FileUploadResponse.self, from: data)
@@ -87,13 +90,16 @@ class SonioxTranscriptionService {
             payload["enable_language_identification"] = true
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw CloudTranscriptionError.networkError(URLError(.badServerResponse))
-        }
-        if !(200...299).contains(httpResponse.statusCode) {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
-            throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
+        let data = try await CloudTranscriptionRetry.withRetry {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw CloudTranscriptionError.networkError(URLError(.badServerResponse))
+            }
+            if !(200...299).contains(httpResponse.statusCode) {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
+                throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
+            }
+            return data
         }
         do {
             let createResponse = try JSONDecoder().decode(CreateTranscriptionResponse.self, from: data)
@@ -113,13 +119,16 @@ class SonioxTranscriptionService {
             var request = URLRequest(url: baseURL)
             request.httpMethod = "GET"
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw CloudTranscriptionError.networkError(URLError(.badServerResponse))
-            }
-            if !(200...299).contains(httpResponse.statusCode) {
-                let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
-                throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
+            let data = try await CloudTranscriptionRetry.withRetry {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw CloudTranscriptionError.networkError(URLError(.badServerResponse))
+                }
+                if !(200...299).contains(httpResponse.statusCode) {
+                    let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
+                    throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
+                }
+                return data
             }
             do {
                 let status = try JSONDecoder().decode(TranscriptionStatusResponse.self, from: data)
@@ -148,13 +157,16 @@ class SonioxTranscriptionService {
         var request = URLRequest(url: apiURL)
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw CloudTranscriptionError.networkError(URLError(.badServerResponse))
-        }
-        if !(200...299).contains(httpResponse.statusCode) {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
-            throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
+        let data = try await CloudTranscriptionRetry.withRetry {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw CloudTranscriptionError.networkError(URLError(.badServerResponse))
+            }
+            if !(200...299).contains(httpResponse.statusCode) {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
+                throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
+            }
+            return data
         }
         if let decoded = try? JSONDecoder().decode(TranscriptResponse.self, from: data) {
             return decoded.text

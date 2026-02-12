@@ -44,12 +44,14 @@ class MistralTranscriptionService {
         request.httpBody = body
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                let errorResponse = String(data: data, encoding: .utf8) ?? "No response body"
-                logger.error("Mistral transcription request failed with status code \((response as? HTTPURLResponse)?.statusCode ?? 500): \(errorResponse)")
-                throw CloudTranscriptionError.apiRequestFailed(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 500, message: errorResponse)
+            let data = try await CloudTranscriptionRetry.withRetry {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                    let errorResponse = String(data: data, encoding: .utf8) ?? "No response body"
+                    self.logger.error("Mistral transcription request failed with status code \((response as? HTTPURLResponse)?.statusCode ?? 500): \(errorResponse)")
+                    throw CloudTranscriptionError.apiRequestFailed(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 500, message: errorResponse)
+                }
+                return data
             }
 
             do {

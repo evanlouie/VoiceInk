@@ -19,15 +19,16 @@ class ElevenLabsTranscriptionService {
         
         let body = try createRequestBody(audioURL: audioURL, modelName: model.name, boundary: boundary)
         
-        let (data, response) = try await URLSession.shared.upload(for: request, from: body)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw CloudTranscriptionError.networkError(URLError(.badServerResponse))
-        }
-
-        if !(200...299).contains(httpResponse.statusCode) {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
-            throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
+        let data = try await CloudTranscriptionRetry.withRetry {
+            let (data, response) = try await URLSession.shared.upload(for: request, from: body)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw CloudTranscriptionError.networkError(URLError(.badServerResponse))
+            }
+            if !(200...299).contains(httpResponse.statusCode) {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
+                throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
+            }
+            return data
         }
         
         do {
