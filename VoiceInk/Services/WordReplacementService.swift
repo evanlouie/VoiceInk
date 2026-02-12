@@ -36,11 +36,12 @@ class WordReplacementService {
                     let pattern = "\\b\(NSRegularExpression.escapedPattern(for: original))\\b"
                     if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
                         let range = NSRange(modifiedText.startIndex..., in: modifiedText)
+                        let escapedTemplate = NSRegularExpression.escapedTemplate(for: replacementText)
                         modifiedText = regex.stringByReplacingMatches(
                             in: modifiedText,
                             options: [],
                             range: range,
-                            withTemplate: replacementText
+                            withTemplate: escapedTemplate
                         )
                     }
                 } else {
