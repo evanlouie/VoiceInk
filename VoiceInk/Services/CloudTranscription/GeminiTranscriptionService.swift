@@ -54,7 +54,7 @@ class GeminiTranscriptionService {
             }
             if !(200...299).contains(httpResponse.statusCode) {
                 let errorMessage = String(data: data, encoding: .utf8) ?? "No error message"
-                self.logger.error("Gemini API request failed with status \(httpResponse.statusCode): \(errorMessage, privacy: .public)")
+                self.logger.error("Gemini API request failed with status \(httpResponse.statusCode): \(errorMessage)")
                 throw CloudTranscriptionError.apiRequestFailed(statusCode: httpResponse.statusCode, message: errorMessage)
             }
             return data

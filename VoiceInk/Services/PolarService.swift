@@ -9,8 +9,10 @@ class PolarService {
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "PolarService")
     
     // Create an authenticated URLRequest for the given endpoint
-    private func createAuthenticatedRequest(endpoint: String, method: String = "POST") -> URLRequest {
-        let url = URL(string: "\(baseURL)\(endpoint)")!
+    private func createAuthenticatedRequest(endpoint: String, method: String = "POST") throws -> URLRequest {
+        guard let url = URL(string: "\(baseURL)\(endpoint)") else {
+            throw LicenseError.validationFailed("Invalid URL: \(baseURL)\(endpoint)")
+        }
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
@@ -53,7 +55,7 @@ class PolarService {
     
     // Check if a license key requires activation
     func checkLicenseRequiresActivation(_ key: String) async throws -> (isValid: Bool, requiresActivation: Bool, activationsLimit: Int?) {
-        var request = createAuthenticatedRequest(endpoint: "/v1/license-keys/validate")
+        var request = try createAuthenticatedRequest(endpoint: "/v1/license-keys/validate")
         
         let body: [String: Any] = [
             "key": key,
@@ -67,7 +69,7 @@ class PolarService {
         if let httpResponse = httpResponse as? HTTPURLResponse {
             if !(200...299).contains(httpResponse.statusCode) {
                 let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
-                logger.notice("🔑 License validation failed [HTTP \(httpResponse.statusCode)]: \(errorMsg, privacy: .public)")
+                logger.notice("🔑 License validation failed [HTTP \(httpResponse.statusCode)]: \(errorMsg)")
                 throw LicenseError.validationFailed(errorMsg)
             }
         }
@@ -75,7 +77,7 @@ class PolarService {
         // Log successful response
         let rawResponse = String(data: data, encoding: .utf8) ?? "Unable to decode response"
         let statusCode = (httpResponse as? HTTPURLResponse)?.statusCode ?? 0
-        logger.notice("🔑 License validation success [HTTP \(statusCode)]: \(rawResponse, privacy: .public)")
+        logger.notice("🔑 License validation success [HTTP \(statusCode)]: \(rawResponse)")
         
         let validationResponse = try JSONDecoder().decode(LicenseValidationResponse.self, from: data)
         let isValid = validationResponse.status == "granted"
@@ -88,7 +90,7 @@ class PolarService {
     
     // Activate a license key on this device
     func activateLicenseKey(_ key: String) async throws -> (activationId: String, activationsLimit: Int) {
-        var request = createAuthenticatedRequest(endpoint: "/v1/license-keys/activate")
+        var request = try createAuthenticatedRequest(endpoint: "/v1/license-keys/activate")
         
         let deviceId = getDeviceIdentifier()
         let hostname = Host.current().localizedName ?? "Unknown Mac"
@@ -107,7 +109,7 @@ class PolarService {
         if let httpResponse = httpResponse as? HTTPURLResponse {
             if !(200...299).contains(httpResponse.statusCode) {
                 let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
-                logger.notice("🔑 License activation failed [HTTP \(httpResponse.statusCode)]: \(errorMsg, privacy: .public)")
+                logger.notice("🔑 License activation failed [HTTP \(httpResponse.statusCode)]: \(errorMsg)")
                 
                 // Check for specific error messages
                 if errorMsg.contains("activation limit") || errorMsg.contains("maximum activations") {
@@ -123,7 +125,7 @@ class PolarService {
         // Log successful response
         let rawResponse = String(data: data, encoding: .utf8) ?? "Unable to decode response"
         let statusCode = (httpResponse as? HTTPURLResponse)?.statusCode ?? 0
-        logger.notice("🔑 License activation success [HTTP \(statusCode)]: \(rawResponse, privacy: .public)")
+        logger.notice("🔑 License activation success [HTTP \(statusCode)]: \(rawResponse)")
         
         let activationResult = try JSONDecoder().decode(ActivationResult.self, from: data)
         
@@ -132,7 +134,7 @@ class PolarService {
     
     // Validate a license key with an activation ID
     func validateLicenseKeyWithActivation(_ key: String, activationId: String) async throws -> Bool {
-        var request = createAuthenticatedRequest(endpoint: "/v1/license-keys/validate")
+        var request = try createAuthenticatedRequest(endpoint: "/v1/license-keys/validate")
         
         let body: [String: Any] = [
             "key": key,
@@ -147,7 +149,7 @@ class PolarService {
         if let httpResponse = httpResponse as? HTTPURLResponse {
             if !(200...299).contains(httpResponse.statusCode) {
                 let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
-                logger.notice("🔑 License validation with activation failed [HTTP \(httpResponse.statusCode)]: \(errorMsg, privacy: .public)")
+                logger.notice("🔑 License validation with activation failed [HTTP \(httpResponse.statusCode)]: \(errorMsg)")
                 throw LicenseError.validationFailed(errorMsg)
             }
         }
@@ -155,7 +157,7 @@ class PolarService {
         // Log successful response
         let rawResponse = String(data: data, encoding: .utf8) ?? "Unable to decode response"
         let statusCode = (httpResponse as? HTTPURLResponse)?.statusCode ?? 0
-        logger.notice("🔑 License validation with activation success [HTTP \(statusCode)]: \(rawResponse, privacy: .public)")
+        logger.notice("🔑 License validation with activation success [HTTP \(statusCode)]: \(rawResponse)")
         
         let validationResponse = try JSONDecoder().decode(LicenseValidationResponse.self, from: data)
         
