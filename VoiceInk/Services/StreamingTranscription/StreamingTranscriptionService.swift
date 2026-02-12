@@ -45,7 +45,7 @@ class StreamingTranscriptionService {
     private var provider: StreamingTranscriptionProvider?
     private var sendTask: Task<Void, Never>?
     private var eventConsumerTask: Task<Void, Never>?
-    private let chunkSource = AudioChunkSource()
+    private var chunkSource = AudioChunkSource()
     private var state: StreamingState = .idle
     private var committedSegments: [String] = []
     private let parakeetService: ParakeetTranscriptionService
@@ -76,6 +76,7 @@ class StreamingTranscriptionService {
     func startStreaming(model: any TranscriptionModel) async throws {
         state = .connecting
         committedSegments = []
+        chunkSource = AudioChunkSource()
 
         let provider = createProvider(for: model)
         self.provider = provider
