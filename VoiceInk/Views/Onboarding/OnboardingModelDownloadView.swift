@@ -9,7 +9,12 @@ struct OnboardingModelDownloadView: View {
     @State private var isModelSet = false
     @State private var showTutorial = false
     
-    private let turboModel = PredefinedModels.models.first { $0.name == "ggml-large-v3-turbo-q5_0" } as! LocalModel
+    private let turboModel: LocalModel = {
+        guard let model = PredefinedModels.models.first(where: { $0.name == "ggml-large-v3-turbo-q5_0" }) as? LocalModel else {
+            fatalError("Required model 'ggml-large-v3-turbo-q5_0' not found in PredefinedModels.")
+        }
+        return model
+    }()
     
     var body: some View {
         ZStack {

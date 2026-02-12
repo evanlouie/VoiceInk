@@ -58,10 +58,14 @@ class MiniWindowManager: ObservableObject {
         
         let miniRecorderView = MiniRecorderView(whisperState: whisperState, recorder: recorder)
             .environmentObject(self)
-            .environmentObject(whisperState.enhancementService!)
         
-        let hostingController = NSHostingController(rootView: miniRecorderView)
-        panel.contentView = hostingController.view
+        if let enhancementService = whisperState.enhancementService {
+            let hostingController = NSHostingController(rootView: miniRecorderView.environmentObject(enhancementService))
+            panel.contentView = hostingController.view
+        } else {
+            let hostingController = NSHostingController(rootView: miniRecorderView)
+            panel.contentView = hostingController.view
+        }
         
         self.miniPanel = panel
         self.windowController = NSWindowController(window: panel)

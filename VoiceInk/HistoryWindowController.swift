@@ -33,10 +33,14 @@ class HistoryWindowController: NSObject, NSWindowDelegate {
         let historyView = TranscriptionHistoryView()
             .modelContainer(modelContainer)
             .environmentObject(whisperState)
-            .environmentObject(whisperState.enhancementService!)
             .frame(minWidth: 1000, minHeight: 700)
-
-        let hostingController = NSHostingController(rootView: historyView)
+        
+        let hostingController: NSHostingController<AnyView>
+        if let enhancementService = whisperState.enhancementService {
+            hostingController = NSHostingController(rootView: AnyView(historyView.environmentObject(enhancementService)))
+        } else {
+            hostingController = NSHostingController(rootView: AnyView(historyView))
+        }
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1100, height: 750),
