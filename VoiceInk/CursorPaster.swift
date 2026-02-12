@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 
+@MainActor
 class CursorPaster {
 
     static func pasteAtCursor(_ text: String) {

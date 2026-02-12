@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 
+@MainActor
 class MiniWindowManager: ObservableObject {
     @Published var isVisible = false
     private var windowController: NSWindowController?
@@ -14,7 +15,7 @@ class MiniWindowManager: ObservableObject {
         setupNotifications()
     }
     
-    deinit {
+    nonisolated deinit {
         NotificationCenter.default.removeObserver(self)
     }
     
@@ -27,8 +28,10 @@ class MiniWindowManager: ObservableObject {
         )
     }
     
-    @objc private func handleHideNotification() {
-        hide()
+    @objc private nonisolated func handleHideNotification() {
+        Task { @MainActor in
+            hide()
+        }
     }
     func show() {
         if isVisible { return }

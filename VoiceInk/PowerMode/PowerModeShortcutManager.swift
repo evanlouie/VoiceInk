@@ -19,7 +19,7 @@ class PowerModeShortcutManager {
         )
     }
     
-    deinit {
+    nonisolated deinit {
         NotificationCenter.default.removeObserver(self)
     }
 
