@@ -26,7 +26,7 @@ class ActiveWindowService: ObservableObject {
     
     func applyConfiguration(powerModeId: UUID? = nil) async {
         if let powerModeId = powerModeId,
-           let config = await MainActor.run({ PowerModeManager.shared.getConfiguration(with: powerModeId) }) {
+           let config = await MainActor.run { PowerModeManager.shared.getConfiguration(with: powerModeId) } {
             await MainActor.run {
                 PowerModeManager.shared.setActiveConfiguration(config)
             }
@@ -48,7 +48,7 @@ class ActiveWindowService: ObservableObject {
         if let browserType = BrowserType.allCases.first(where: { $0.bundleIdentifier == bundleIdentifier }) {
             do {
                 let currentURL = try await browserURLService.getCurrentURL(from: browserType)
-                if let config = await MainActor.run({ PowerModeManager.shared.getConfigurationForURL(currentURL) }) {
+                if let config = await MainActor.run(body: { PowerModeManager.shared.getConfigurationForURL(currentURL) }) {
                     configToApply = config
                 }
             } catch {

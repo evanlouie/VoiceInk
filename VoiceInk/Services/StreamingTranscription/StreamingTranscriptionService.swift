@@ -45,7 +45,7 @@ class StreamingTranscriptionService {
     private var provider: StreamingTranscriptionProvider?
     private var sendTask: Task<Void, Never>?
     private var eventConsumerTask: Task<Void, Never>?
-    private var chunkSource = AudioChunkSource()
+    nonisolated(unsafe) private var chunkSource = AudioChunkSource()
     private var state: StreamingState = .idle
     private var committedSegments: [String] = []
     private let parakeetService: ParakeetTranscriptionService
