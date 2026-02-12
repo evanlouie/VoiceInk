@@ -428,8 +428,20 @@ class HotkeyManager: ObservableObject {
     }
     
     deinit {
-        Task { @MainActor in
-            removeAllMonitoring()
+        // Clean up event monitors directly without capturing self in a Task.
+        // NSEvent monitors and Task.cancel() are safe to call during deinit.
+        if let monitor = globalEventMonitor {
+            NSEvent.removeMonitor(monitor)
         }
+        if let monitor = localEventMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        for monitor in middleClickMonitors {
+            if let monitor = monitor {
+                NSEvent.removeMonitor(monitor)
+            }
+        }
+        middleClickTask?.cancel()
+        fnDebounceTask?.cancel()
     }
 }
