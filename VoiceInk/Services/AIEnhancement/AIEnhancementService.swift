@@ -139,11 +139,31 @@ class AIEnhancementService: ObservableObject {
         lastRequestTime = Date()
     }
 
+    /// Sanitize untrusted text by inserting zero-width spaces into XML-like tags
+    /// that could break out of the structured prompt context.
+    private func sanitizeContextText(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "</TRANSCRIPT>", with: "</\u{200B}TRANSCRIPT>", options: .caseInsensitive)
+            .replacingOccurrences(of: "</CLIPBOARD_CONTEXT>", with: "</\u{200B}CLIPBOARD_CONTEXT>", options: .caseInsensitive)
+            .replacingOccurrences(of: "</CURRENT_WINDOW_CONTEXT>", with: "</\u{200B}CURRENT_WINDOW_CONTEXT>", options: .caseInsensitive)
+            .replacingOccurrences(of: "</CURRENTLY_SELECTED_TEXT>", with: "</\u{200B}CURRENTLY_SELECTED_TEXT>", options: .caseInsensitive)
+            .replacingOccurrences(of: "</CUSTOM_VOCABULARY>", with: "</\u{200B}CUSTOM_VOCABULARY>", options: .caseInsensitive)
+            .replacingOccurrences(of: "</SYSTEM_INSTRUCTIONS>", with: "</\u{200B}SYSTEM_INSTRUCTIONS>", options: .caseInsensitive)
+            .replacingOccurrences(of: "</CONTEXT_INFORMATION>", with: "</\u{200B}CONTEXT_INFORMATION>", options: .caseInsensitive)
+            .replacingOccurrences(of: "<TRANSCRIPT>", with: "<\u{200B}TRANSCRIPT>", options: .caseInsensitive)
+            .replacingOccurrences(of: "<CLIPBOARD_CONTEXT>", with: "<\u{200B}CLIPBOARD_CONTEXT>", options: .caseInsensitive)
+            .replacingOccurrences(of: "<CURRENT_WINDOW_CONTEXT>", with: "<\u{200B}CURRENT_WINDOW_CONTEXT>", options: .caseInsensitive)
+            .replacingOccurrences(of: "<CURRENTLY_SELECTED_TEXT>", with: "<\u{200B}CURRENTLY_SELECTED_TEXT>", options: .caseInsensitive)
+            .replacingOccurrences(of: "<CUSTOM_VOCABULARY>", with: "<\u{200B}CUSTOM_VOCABULARY>", options: .caseInsensitive)
+            .replacingOccurrences(of: "<SYSTEM_INSTRUCTIONS>", with: "<\u{200B}SYSTEM_INSTRUCTIONS>", options: .caseInsensitive)
+            .replacingOccurrences(of: "<CONTEXT_INFORMATION>", with: "<\u{200B}CONTEXT_INFORMATION>", options: .caseInsensitive)
+    }
+
     private func getSystemMessage(for mode: EnhancementPrompt) async -> String {
         let selectedTextContext: String
         if AXIsProcessTrusted() {
             if let selectedText = await SelectedTextService.fetchSelectedText(), !selectedText.isEmpty {
-                selectedTextContext = "\n\n<CURRENTLY_SELECTED_TEXT>\n\(selectedText)\n</CURRENTLY_SELECTED_TEXT>"
+                selectedTextContext = "\n\n<CURRENTLY_SELECTED_TEXT>\n\(sanitizeContextText(selectedText))\n</CURRENTLY_SELECTED_TEXT>"
             } else {
                 selectedTextContext = ""
             }
@@ -154,7 +174,7 @@ class AIEnhancementService: ObservableObject {
         let clipboardContext = if useClipboardContext,
                               let clipboardText = lastCapturedClipboard,
                               !clipboardText.isEmpty {
-            "\n\n<CLIPBOARD_CONTEXT>\n\(clipboardText)\n</CLIPBOARD_CONTEXT>"
+            "\n\n<CLIPBOARD_CONTEXT>\n\(sanitizeContextText(clipboardText))\n</CLIPBOARD_CONTEXT>"
         } else {
             ""
         }
@@ -162,7 +182,7 @@ class AIEnhancementService: ObservableObject {
         let screenCaptureContext = if useScreenCaptureContext,
                                    let capturedText = screenCaptureService.lastCapturedText,
                                    !capturedText.isEmpty {
-            "\n\n<CURRENT_WINDOW_CONTEXT>\n\(capturedText)\n</CURRENT_WINDOW_CONTEXT>"
+            "\n\n<CURRENT_WINDOW_CONTEXT>\n\(sanitizeContextText(capturedText))\n</CURRENT_WINDOW_CONTEXT>"
         } else {
             ""
         }
@@ -193,7 +213,9 @@ class AIEnhancementService: ObservableObject {
                 return activePrompt.finalPromptText + finalContextSection
             }
         } else {
-            let defaultPrompt = allPrompts.first(where: { $0.id == PredefinedPrompts.defaultPromptId }) ?? allPrompts.first!
+            guard let defaultPrompt = allPrompts.first(where: { $0.id == PredefinedPrompts.defaultPromptId }) ?? allPrompts.first else {
+                return finalContextSection
+            }
             return defaultPrompt.finalPromptText + finalContextSection
         }
     }
@@ -207,23 +229,7 @@ class AIEnhancementService: ObservableObject {
             return "" // Silently return empty string instead of throwing error
         }
 
-        let sanitizedText = text
-            // Sanitize closing tags
-            .replacingOccurrences(of: "</TRANSCRIPT>", with: "</\u{200B}TRANSCRIPT>", options: .caseInsensitive)
-            .replacingOccurrences(of: "</CLIPBOARD_CONTEXT>", with: "</\u{200B}CLIPBOARD_CONTEXT>", options: .caseInsensitive)
-            .replacingOccurrences(of: "</CURRENT_WINDOW_CONTEXT>", with: "</\u{200B}CURRENT_WINDOW_CONTEXT>", options: .caseInsensitive)
-            .replacingOccurrences(of: "</CURRENTLY_SELECTED_TEXT>", with: "</\u{200B}CURRENTLY_SELECTED_TEXT>", options: .caseInsensitive)
-            .replacingOccurrences(of: "</CUSTOM_VOCABULARY>", with: "</\u{200B}CUSTOM_VOCABULARY>", options: .caseInsensitive)
-            .replacingOccurrences(of: "</SYSTEM_INSTRUCTIONS>", with: "</\u{200B}SYSTEM_INSTRUCTIONS>", options: .caseInsensitive)
-            .replacingOccurrences(of: "</CONTEXT_INFORMATION>", with: "</\u{200B}CONTEXT_INFORMATION>", options: .caseInsensitive)
-            // Sanitize opening tags
-            .replacingOccurrences(of: "<TRANSCRIPT>", with: "<\u{200B}TRANSCRIPT>", options: .caseInsensitive)
-            .replacingOccurrences(of: "<CLIPBOARD_CONTEXT>", with: "<\u{200B}CLIPBOARD_CONTEXT>", options: .caseInsensitive)
-            .replacingOccurrences(of: "<CURRENT_WINDOW_CONTEXT>", with: "<\u{200B}CURRENT_WINDOW_CONTEXT>", options: .caseInsensitive)
-            .replacingOccurrences(of: "<CURRENTLY_SELECTED_TEXT>", with: "<\u{200B}CURRENTLY_SELECTED_TEXT>", options: .caseInsensitive)
-            .replacingOccurrences(of: "<CUSTOM_VOCABULARY>", with: "<\u{200B}CUSTOM_VOCABULARY>", options: .caseInsensitive)
-            .replacingOccurrences(of: "<SYSTEM_INSTRUCTIONS>", with: "<\u{200B}SYSTEM_INSTRUCTIONS>", options: .caseInsensitive)
-            .replacingOccurrences(of: "<CONTEXT_INFORMATION>", with: "<\u{200B}CONTEXT_INFORMATION>", options: .caseInsensitive)
+        let sanitizedText = sanitizeContextText(text)
         let formattedText = "\n<TRANSCRIPT>\n\(sanitizedText)\n</TRANSCRIPT>"
         let systemMessage = await getSystemMessage(for: mode)
         
@@ -260,13 +266,16 @@ class AIEnhancementService: ObservableObject {
                 ]
             ]
 
-            var request = URLRequest(url: URL(string: aiService.selectedProvider.baseURL)!)
+            guard let url = URL(string: aiService.selectedProvider.baseURL) else {
+                throw EnhancementError.customError("Invalid API URL: \(aiService.selectedProvider.baseURL)")
+            }
+            var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.addValue("application/json", forHTTPHeaderField: "Content-Type")
             request.addValue(aiService.apiKey, forHTTPHeaderField: "x-api-key")
             request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
             request.timeoutInterval = baseTimeout
-            request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
             do {
                 let (data, response) = try await URLSession.shared.data(for: request)
@@ -303,7 +312,9 @@ class AIEnhancementService: ObservableObject {
             }
 
         default:
-            let url = URL(string: aiService.selectedProvider.baseURL)!
+            guard let url = URL(string: aiService.selectedProvider.baseURL) else {
+                throw EnhancementError.customError("Invalid API URL: \(aiService.selectedProvider.baseURL)")
+            }
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.addValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -327,7 +338,7 @@ class AIEnhancementService: ObservableObject {
                 requestBody["reasoning_effort"] = reasoningEffort
             }
 
-            request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
             do {
                 let (data, response) = try await URLSession.shared.data(for: request)
