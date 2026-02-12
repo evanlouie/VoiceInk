@@ -296,12 +296,7 @@ class MiniRecorderShortcutManager: ObservableObject {
     
     deinit {
         visibilityTask?.cancel()
+        escapeTimeoutTask?.cancel()
         NotificationCenter.default.removeObserver(self)
-        Task { @MainActor in
-            deactivateEscapeShortcut()
-            deactivateCancelShortcut()
-            removeEnhancementShortcut()
-            removePowerModeShortcuts()
-        }
     }
 } 
