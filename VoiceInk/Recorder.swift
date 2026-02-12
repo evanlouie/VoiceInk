@@ -198,17 +198,17 @@ class Recorder: NSObject, ObservableObject {
     }
 
     private func startAudioMeterTimer() {
+        guard let recorder = recorder else { return }
         let timer = DispatchSource.makeTimerSource(queue: audioMeterQueue)
         timer.schedule(deadline: .now(), repeating: .milliseconds(17)) 
         timer.setEventHandler { [weak self] in
-            self?.updateAudioMeter()
+            self?.updateAudioMeter(recorder: recorder)
         }
         timer.resume()
         audioMeterUpdateTimer = timer
     }
 
-    private func updateAudioMeter() {
-        guard let recorder = recorder else { return }
+    private func updateAudioMeter(recorder: CoreAudioRecorder) {
 
         // Sample audio levels (thread-safe read)
         let averagePower = recorder.averagePower

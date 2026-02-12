@@ -7,7 +7,15 @@ enum WhisperStateError: Error, Identifiable {
     case unzipFailed
     case unknownError
     
-    var id: String { UUID().uuidString }
+    var id: String {
+        switch self {
+        case .modelLoadFailed: return "modelLoadFailed"
+        case .transcriptionFailed: return "transcriptionFailed"
+        case .whisperCoreFailed: return "whisperCoreFailed"
+        case .unzipFailed: return "unzipFailed"
+        case .unknownError: return "unknownError"
+        }
+    }
 }
 
 extension WhisperStateError: LocalizedError {

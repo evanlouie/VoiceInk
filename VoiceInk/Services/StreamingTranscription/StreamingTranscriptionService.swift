@@ -8,7 +8,7 @@ private final class AudioChunkSource: @unchecked Sendable {
     private let continuation: AsyncStream<Data>.Continuation
 
     init() {
-        let (stream, continuation) = AsyncStream.makeStream(of: Data.self, bufferingPolicy: .unbounded)
+        let (stream, continuation) = AsyncStream.makeStream(of: Data.self, bufferingPolicy: .bufferingNewest(1000))
         self.stream = stream
         self.continuation = continuation
     }
