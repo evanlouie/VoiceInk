@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import os
 
+@MainActor
 class LocalTranscriptionService: TranscriptionService {
     
     private var whisperContext: WhisperContext?

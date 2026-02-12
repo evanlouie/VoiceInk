@@ -4,6 +4,7 @@ import AVFoundation
 import FluidAudio
 import os.log
 
+@MainActor
 class ParakeetTranscriptionService: TranscriptionService {
     private var asrManager: AsrManager?
     private var vadManager: VadManager?

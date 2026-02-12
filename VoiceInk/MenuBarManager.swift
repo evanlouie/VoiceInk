@@ -1,8 +1,12 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import os
 
+@MainActor
 class MenuBarManager: ObservableObject {
+    private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "MenuBarManager")
+
     @Published var isMenuBarOnly: Bool {
         didSet {
             UserDefaults.standard.set(isMenuBarOnly, forKey: "IsMenuBarOnly")
@@ -58,7 +62,7 @@ class MenuBarManager: ObservableObject {
     func focusMainWindow() {
         NSApplication.shared.setActivationPolicy(.regular)
         if WindowManager.shared.showMainWindow() == nil {
-            print("MenuBarManager: Unable to locate main window to focus")
+            logger.warning("Unable to locate main window to focus")
         }
     }
     
@@ -83,12 +87,12 @@ class MenuBarManager: ObservableObject {
     }
     
     func openMainWindowAndNavigate(to destination: String) {
-        print("MenuBarManager: Navigating to \(destination)")
+        logger.notice("Navigating to \(destination)")
 
         NSApplication.shared.setActivationPolicy(.regular)
 
         guard WindowManager.shared.showMainWindow() != nil else {
-            print("MenuBarManager: Unable to show main window for navigation")
+            logger.warning("Unable to show main window for navigation")
             return
         }
 
@@ -99,14 +103,14 @@ class MenuBarManager: ObservableObject {
                 object: nil,
                 userInfo: ["destination": destination]
             )
-            print("MenuBarManager: Posted navigation notification for \(destination)")
+            self.logger.notice("Posted navigation notification for \(destination)")
         }
     }
 
     func openHistoryWindow() {
         guard let modelContainer = modelContainer,
               let whisperState = whisperState else {
-            print("MenuBarManager: Dependencies not configured")
+            logger.warning("Dependencies not configured")
             return
         }
         NSApplication.shared.setActivationPolicy(.regular)

@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import AppKit
 
+@MainActor
 struct EmailSupport {
     static func generateSupportEmailURL() -> URL? {
         let subject = "VoiceInk Support Request"

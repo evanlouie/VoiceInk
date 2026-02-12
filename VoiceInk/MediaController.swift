@@ -1,6 +1,7 @@
 import Foundation
 import CoreAudio
 
+@MainActor
 final class MediaController: ObservableObject {
 
     static let shared = MediaController()

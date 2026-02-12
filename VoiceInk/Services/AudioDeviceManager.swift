@@ -15,6 +15,7 @@ enum AudioInputMode: String, CaseIterable {
     case prioritized = "Prioritized"
 }
 
+@MainActor
 class AudioDeviceManager: ObservableObject {
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "AudioDeviceManager")
     @Published var availableDevices: [(id: AudioDeviceID, uid: String, name: String)] = []
@@ -387,19 +388,23 @@ class AudioDeviceManager: ObservableObject {
         let status = AudioObjectAddPropertyListener(
             systemObjectID,
             &address,
-            { (_, _, _, userData) -> OSStatus in
-                let manager = Unmanaged<AudioDeviceManager>.fromOpaque(userData!).takeUnretainedValue()
-                DispatchQueue.main.async {
-                    manager.handleDeviceListChange()
-                }
-                return noErr
-            },
+            AudioDeviceManager.deviceChangeListenerProc,
             UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         )
         
         if status != noErr {
             logger.error("Failed to add device change listener: \(status)")
         }
+    }
+    
+    /// Static callback for CoreAudio property listener — same function pointer used for add and remove.
+    private static let deviceChangeListenerProc: AudioObjectPropertyListenerProc = { (_, _, _, userData) -> OSStatus in
+        guard let userData = userData else { return noErr }
+        let manager = Unmanaged<AudioDeviceManager>.fromOpaque(userData).takeUnretainedValue()
+        DispatchQueue.main.async {
+            manager.handleDeviceListChange()
+        }
+        return noErr
     }
     
     private func handleDeviceListChange() {
@@ -477,9 +482,7 @@ class AudioDeviceManager: ObservableObject {
         AudioObjectRemovePropertyListener(
             AudioObjectID(kAudioObjectSystemObject),
             &address,
-            { (_, _, _, userData) -> OSStatus in
-                return noErr
-            },
+            AudioDeviceManager.deviceChangeListenerProc,
             UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         )
     }
