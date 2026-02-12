@@ -15,9 +15,22 @@ final class AnnouncementsService {
     // Fetch every 4 hours
     private let refreshInterval: TimeInterval = 4 * 60 * 60
 
+    // 100 KB – announcements JSON should be tiny
+    private let maxResponseBytes = 100 * 1024
+
     private let dismissedKey = "dismissedAnnouncementIds"
     private let maxDismissedToKeep = 2
     private var timer: Timer?
+
+    private let allowedHosts: [String] = [
+        "tryvoiceink.com",
+        "github.com",
+        "youtube.com",
+        "x.com",
+        "twitter.com",
+        "discord.com",
+        "discord.gg",
+    ]
 
     // MARK: - Public API
 
@@ -44,6 +57,14 @@ final class AnnouncementsService {
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
             guard error == nil, let data = data else { return }
+
+            // Validate HTTP status code
+            if let httpResponse = response as? HTTPURLResponse,
+               !(200...299).contains(httpResponse.statusCode) { return }
+
+            // Reject oversized responses
+            guard data.count <= self.maxResponseBytes else { return }
+
             guard let announcements = try? JSONDecoder().decode([RemoteAnnouncement].self, from: data) else { return }
 
             let now = Date()
@@ -53,7 +74,7 @@ final class AnnouncementsService {
             guard let next = valid.first else { return }
 
             DispatchQueue.main.async {
-                let url = next.url.flatMap { URL(string: $0) }
+                let url = next.url.flatMap { URL(string: $0) }.flatMap { self.sanitizedURL($0) }
                 AnnouncementManager.shared.showAnnouncement(
                     title: next.title,
                     description: next.description,
@@ -68,6 +89,16 @@ final class AnnouncementsService {
     private func isDismissed(_ id: String) -> Bool {
         let set = UserDefaults.standard.stringArray(forKey: dismissedKey) ?? []
         return set.contains(id)
+    }
+
+    /// Returns the URL only if it uses HTTPS and its host matches the allowlist.
+    private func sanitizedURL(_ url: URL) -> URL? {
+        guard url.scheme?.lowercased() == "https" else { return nil }
+        guard let host = url.host?.lowercased() else { return nil }
+        let matched = allowedHosts.contains { allowed in
+            host == allowed || host.hasSuffix("." + allowed)
+        }
+        return matched ? url : nil
     }
 
     private func markDismissed(_ id: String) {
@@ -102,5 +133,3 @@ private struct RemoteAnnouncement: Decodable {
     }
 
 }
-
-
